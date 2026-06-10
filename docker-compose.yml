@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
       POSTGRES_DB: agroguide
     ports:
       - "5432:5432"
@@ -32,11 +32,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@db:5432/agroguide
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/agroguide
       - REDIS_URL=redis://redis:6379/0
       - ML_SERVICE_URL=http://ml_service:8001
-      - JWT_SECRET=super-secret-change-me-in-production-12345
-      - JWT_REFRESH_SECRET=another-super-secret-refresh-key-98765
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me-in-production-12345}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-another-super-secret-refresh-key-98765}
     depends_on:
       - db
       - redis

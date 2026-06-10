@@ -37,6 +37,14 @@ def read_root():
         "fertilizer_model_loaded": model_loader.fertilizer_model is not None
     }
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "crop_model_loaded": model_loader.crop_model is not None,
+        "fertilizer_model_loaded": model_loader.fertilizer_model is not None
+    }
+
 @app.post("/recommendations/crop")
 async def recommend_crop(payload: CropRecommendationInput):
     """Predicts suitable crops based on soil nutrients and climatic parameters."""
@@ -68,7 +76,11 @@ async def recommend_fertilizer(payload: FertilizerRecommendationInput):
 
 @app.post("/disease/detect")
 async def detect_disease(file: UploadFile = File(...)):
-    """Receives leaf image files and returns predicted disease, confidence level, and remedy."""
+    """
+    Receives leaf image files and returns predicted disease, confidence level, and remedy.
+    WARNING: Runs standard color-channel pixel statistics helper heuristics for baseline testing.
+    This is non-production code.
+    """
     # Validate file format
     if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
         raise HTTPException(

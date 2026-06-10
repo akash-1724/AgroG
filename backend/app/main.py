@@ -36,3 +36,10 @@ def read_root():
         "service": settings.PROJECT_NAME,
         "api_prefix": settings.API_V1_STR
     }
+
+@app.get("/health", tags=["status"])
+def health_check():
+    return {
+        "status": "healthy",
+        "service": settings.PROJECT_NAME
+    }
