@@ -26,6 +26,7 @@ class User(Base):
     fertilizer_recommendations: Mapped[List["FertilizerRecommendationRecord"]] = relationship("FertilizerRecommendationRecord", back_populates="user")
     disease_detections: Mapped[List["DiseaseDetectionRecord"]] = relationship("DiseaseDetectionRecord", back_populates="user")
     articles: Mapped[List["EducationalArticle"]] = relationship("EducationalArticle", back_populates="author")
+    refresh_tokens: Mapped[List["RefreshToken"]] = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
 
 class FarmerProfile(Base):
     __tablename__ = "farmer_profiles"
