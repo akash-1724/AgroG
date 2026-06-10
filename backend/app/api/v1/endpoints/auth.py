@@ -1,6 +1,6 @@
 import uuid
 import httpx
-from datetime import timedelta
+from datetime import timedelta, datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token
 from app.models.user import User, FarmerProfile
+from app.models.auth import RefreshToken
 from app.schemas.user import UserCreate, UserResponse, TokenResponse, UserLogin, GoogleLogin
 
 router = APIRouter()
@@ -94,6 +95,15 @@ async def login(
     access_token = create_access_token(subject=user.id, role=user.role)
     refresh_token = create_refresh_token(subject=user.id)
     
+    # Save refresh token in database
+    db_token = RefreshToken(
+        user_id=user.id,
+        token=refresh_token,
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(db_token)
+    await db.commit()
+    
     # Securely set refresh token as HttpOnly cookie
     response.set_cookie(
         key="refresh_token",
@@ -128,6 +138,15 @@ async def login_json(
     
     access_token = create_access_token(subject=user.id, role=user.role)
     refresh_token = create_refresh_token(subject=user.id)
+    
+    # Save refresh token in database
+    db_token = RefreshToken(
+        user_id=user.id,
+        token=refresh_token,
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(db_token)
+    await db.commit()
     
     response.set_cookie(
         key="refresh_token",
