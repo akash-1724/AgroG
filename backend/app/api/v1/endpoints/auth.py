@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token
+from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token
 from app.models.user import User, FarmerProfile
 from app.models.auth import RefreshToken
-from app.schemas.user import UserCreate, UserResponse, TokenResponse, UserLogin, GoogleLogin
+from app.schemas.user import UserCreate, UserResponse, TokenResponse, UserLogin, GoogleLogin, TokenRefreshRequest
 
 router = APIRouter()
 
@@ -232,6 +232,57 @@ async def google_login(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(
+    payload: TokenRefreshRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Renew user access tokens using a valid refresh token."""
+    try:
+        decoded = decode_token(payload.refresh_token, is_refresh=True)
+        user_id = decoded.get("sub")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
+
+    # Check database status and revocation flags
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.token == payload.refresh_token,
+            RefreshToken.is_revoked == False
+        )
+    )
+    db_token = result.scalars().first()
+    if not db_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid or has been revoked."
+        )
+
+    if db_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired."
+        )
+
+    user_result = await db.execute(select(User).where(User.id == db_token.user_id))
+    user = user_result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found."
+        )
+
+    new_access_token = create_access_token(subject=user.id, role=user.role)
+    
+    return {
+        "access_token": new_access_token,
+        "refresh_token": payload.refresh_token,
         "token_type": "bearer"
     }
 
