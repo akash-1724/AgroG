@@ -1,5 +1,5 @@
 import uuid
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,28 @@ from app.models.user import User
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/token"
 )
+
+async def get_current_user_optional(
+    db: AsyncSession = Depends(get_db),
+    token: Optional[str] = Depends(OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token", auto_error=False))
+) -> Optional[User]:
+    """FastAPI dependency to optionally authenticate requests using JWT access tokens."""
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        user_id_str: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        
+        if user_id_str is None or token_type != "access":
+            return None
+        
+        user_id = uuid.UUID(user_id_str)
+    except Exception:
+        return None
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalars().first()
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
