@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.api.deps import get_current_user
 from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token
 from app.models.user import User, FarmerProfile
 from app.models.auth import RefreshToken
@@ -303,4 +304,9 @@ async def logout(
 
     response.delete_cookie(key="refresh_token")
     return {"detail": "Successfully logged out."}
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    """Retrieve details of the currently authenticated user."""
+    return current_user
 
