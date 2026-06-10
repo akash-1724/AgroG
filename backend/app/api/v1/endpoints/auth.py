@@ -286,3 +286,21 @@ async def refresh_token(
         "token_type": "bearer"
     }
 
+@router.post("/logout")
+async def logout(
+    payload: TokenRefreshRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db)
+):
+    """Revoke user refresh tokens and clear auth cookies."""
+    result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token == payload.refresh_token)
+    )
+    db_token = result.scalars().first()
+    if db_token:
+        db_token.is_revoked = True
+        await db.commit()
+
+    response.delete_cookie(key="refresh_token")
+    return {"detail": "Successfully logged out."}
+
