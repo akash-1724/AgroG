@@ -32,10 +32,10 @@ class FarmerProfile(Base):
     __tablename__ = "farmer_profiles"
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    farm_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    latitude: Mapped[float] = mapped_column(Double, nullable=False)
-    longitude: Mapped[float] = mapped_column(Double, nullable=False)
-    address: Mapped[str] = mapped_column(String(500), nullable=False)
+    farm_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Double, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Double, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     rating: Mapped[float] = mapped_column(Float, default=5.0, nullable=False)
 
