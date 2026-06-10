@@ -16,6 +16,13 @@ router = APIRouter()
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     """Register a new user (Customer or Farmer) in the database."""
+    # Enforce role boundaries
+    if user_in.role.lower() == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Public registration of Admin accounts is prohibited."
+        )
+
     # Check if user already exists
     result = await db.execute(select(User).where(User.email == user_in.email))
     existing_user = result.scalars().first()
@@ -32,27 +39,34 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
         password_hash=hashed_password,
         full_name=user_in.full_name,
         phone_number=user_in.phone_number,
-        role=user_in.role
+        role=user_in.role.lower()
     )
     
     db.add(new_user)
     await db.flush() # Populate the ID
     
     # If the user is registering as a farmer, initialize their farmer profile
-    if user_in.role == "farmer":
-        if not user_in.farmer_details:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Farmer details must be provided when registering as a farmer."
-            )
+    if new_user.role == "farmer":
+        farm_name = "New Farm"
+        lat = 0.0
+        lon = 0.0
+        addr = "TBD"
+        desc = ""
         
+        if user_in.farmer_details:
+            farm_name = user_in.farmer_details.farm_name
+            lat = user_in.farmer_details.latitude
+            lon = user_in.farmer_details.longitude
+            addr = user_in.farmer_details.address
+            desc = user_in.farmer_details.description or ""
+            
         new_profile = FarmerProfile(
             user_id=new_user.id,
-            farm_name=user_in.farmer_details.farm_name,
-            latitude=user_in.farmer_details.latitude,
-            longitude=user_in.farmer_details.longitude,
-            address=user_in.farmer_details.address,
-            description=user_in.farmer_details.description
+            farm_name=farm_name,
+            latitude=lat,
+            longitude=lon,
+            address=addr,
+            description=desc
         )
         db.add(new_profile)
     
