@@ -86,6 +86,28 @@ Once services are running, you can verify their status:
   ```
 
 - **Frontend App**: Open [http://localhost:3000](http://localhost:3000) in your web browser.
+ 
+---
+
+## Integration & RBAC Verification Tests
+
+You can run automated integration testing scripts to verify database relationships, authentication state-machines, and Role-Based Access Control logic:
+
+### 1. Verify Authentication & RBAC
+
+Verifies registration rules, JWT login exchanges, profile context lookup, role access restrictions, token refreshes, and database token revocation:
+```bash
+docker compose exec backend python verify_auth.py
+# Or locally inside /backend: python verify_auth.py
+```
+
+### 2. Verify Marketplace Listings & Orders
+
+Verifies listing creation, query search parameters, transactional stock checks, item snapshots, role-protected status transitions, and stock recovery paths:
+```bash
+docker compose exec backend python verify_marketplace.py
+# Or locally inside /backend: python verify_marketplace.py
+```
 
 ---
 

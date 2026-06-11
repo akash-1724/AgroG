@@ -11,6 +11,8 @@ class CropListingCreate(BaseModel):
     unit: str = Field(..., min_length=1, max_length=50) # e.g. "kg", "ton"
     available_quantity: int = Field(..., ge=0)
     image_urls: Optional[str] = Field(None, max_length=2000) # Cloudinary image URL links
+    category: Optional[str] = Field("Vegetables", max_length=100)
+    status: Optional[str] = Field("active", pattern="^(active|inactive|sold_out)$")
 
 # Schema for updating a crop listing
 class CropListingUpdate(BaseModel):
@@ -20,6 +22,8 @@ class CropListingUpdate(BaseModel):
     unit: Optional[str] = Field(None, min_length=1, max_length=50)
     available_quantity: Optional[int] = Field(None, ge=0)
     image_urls: Optional[str] = Field(None, max_length=2000)
+    category: Optional[str] = Field(None, max_length=100)
+    status: Optional[str] = Field(None, pattern="^(active|inactive|sold_out)$")
 
 # Schema for listing response
 class CropListingResponse(BaseModel):
@@ -31,6 +35,8 @@ class CropListingResponse(BaseModel):
     unit: str
     available_quantity: int
     image_urls: Optional[str] = None
+    category: str
+    status: str
     created_at: datetime
     updated_at: datetime
 
@@ -71,5 +77,4 @@ class OrderResponse(BaseModel):
 
 # Schema for updating order status
 class OrderStatusUpdate(BaseModel):
-    status: str = Field(..., description="Target status: pending, shipped, completed, cancelled")
-
+    status: str = Field(..., pattern="^(pending|accepted|rejected|ready|completed|cancelled)$", description="Target status")

@@ -18,6 +18,8 @@ class CropListing(Base):
     unit: Mapped[str] = mapped_column(String(50), nullable=False) # kg, ton, quintal, etc.
     available_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     image_urls: Mapped[str] = mapped_column(String(2000), nullable=True) # comma-separated list of Cloudinary URLs
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False) # active, inactive, sold_out
+    category: Mapped[str] = mapped_column(String(100), default="Vegetables", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

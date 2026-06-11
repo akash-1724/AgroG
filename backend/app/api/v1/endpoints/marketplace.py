@@ -21,19 +21,38 @@ farmer_guard = RoleChecker(allowed_roles=["farmer", "admin"])
 @router.get("/", response_model=List[CropListingResponse])
 async def read_listings(
     search: Optional[str] = Query(None, description="Search term in listing titles or description"),
-    category: Optional[str] = Query(None, description="Optional unit/category filter"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    status: Optional[str] = Query("active", description="Filter by availability status: active, inactive, sold_out, or 'all'"),
+    sort: Optional[str] = Query("latest", description="Sort options: latest, price_asc, price_desc"),
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db)
 ):
-    """Retrieve public active crop listings with search filters and pagination."""
-    query = select(CropListing).where(CropListing.available_quantity > 0)
+    """Retrieve crop listings with paginated search, filtering, and sorting."""
+    query = select(CropListing)
     
+    # Filter by status
+    if status and status != "all":
+        query = query.where(CropListing.status == status)
+    
+    # Filter by category
+    if category:
+        query = query.where(CropListing.category.ilike(category))
+        
+    # Search title or description
     if search:
         query = query.where(
             (CropListing.title.ilike(f"%{search}%")) | 
             (CropListing.description.ilike(f"%{search}%"))
         )
+        
+    # Sorting
+    if sort == "price_asc":
+        query = query.order_by(CropListing.price_per_unit.asc())
+    elif sort == "price_desc":
+        query = query.order_by(CropListing.price_per_unit.desc())
+    else: # Default latest
+        query = query.order_by(CropListing.created_at.desc())
         
     query = query.offset(offset).limit(limit)
     result = await db.execute(query)
@@ -47,7 +66,10 @@ async def create_listing(
 ):
     """Create a new crop listing in the marketplace (Farmer only)."""
     # Verify that the user has a profile initialized
-    if not current_user.farmer_profile:
+    from app.models.user import FarmerProfile
+    res = await db.execute(select(FarmerProfile).where(FarmerProfile.user_id == current_user.id))
+    farmer_profile = res.scalars().first()
+    if not farmer_profile:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User must initialize a Farmer Profile before posting listings."
@@ -60,7 +82,9 @@ async def create_listing(
         price_per_unit=payload.price_per_unit,
         unit=payload.unit,
         available_quantity=payload.available_quantity,
-        image_urls=payload.image_urls
+        image_urls=payload.image_urls,
+        category=payload.category or "Vegetables",
+        status=payload.status or "active"
     )
     
     db.add(new_listing)
@@ -171,6 +195,12 @@ async def place_order(
                 detail=f"Crop listing {item.crop_listing_id} not found."
             )
             
+        if listing.status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Crop listing '{listing.title}' is not active/available."
+            )
+            
         if listing.available_quantity < item.quantity:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -179,6 +209,8 @@ async def place_order(
             
         # Deduct quantity
         listing.available_quantity -= item.quantity
+        if listing.available_quantity == 0:
+            listing.status = "sold_out"
         
         # Calculate item cost
         item_cost = float(listing.price_per_unit) * item.quantity
@@ -195,8 +227,15 @@ async def place_order(
         
     new_order.total_amount = total_amount
     await db.commit()
-    await db.refresh(new_order)
-    return new_order
+    
+    # Eagerly load items for response serialization
+    from sqlalchemy.orm import selectinload
+    res = await db.execute(
+        select(Order)
+        .where(Order.id == new_order.id)
+        .options(selectinload(Order.items))
+    )
+    return res.scalars().first()
 
 @router.get("/orders", response_model=List[OrderResponse])
 async def list_orders(
@@ -204,21 +243,26 @@ async def list_orders(
     db: AsyncSession = Depends(get_db)
 ):
     """List orders. Admin sees all, Farmer sees items from their shop, Customer sees their orders."""
+    from sqlalchemy.orm import selectinload
     if current_user.role == "admin":
-        result = await db.execute(select(Order))
+        result = await db.execute(select(Order).options(selectinload(Order.items)))
         return result.scalars().all()
         
     elif current_user.role == "farmer":
         # Select orders that contain at least one item belonging to this farmer's crop listings
         query = select(Order).join(OrderItem).join(CropListing).where(
             CropListing.farmer_id == current_user.id
-        ).distinct()
+        ).options(selectinload(Order.items)).distinct()
         result = await db.execute(query)
         return result.scalars().all()
         
     else:
         # Customer sees their own orders
-        result = await db.execute(select(Order).where(Order.customer_id == current_user.id))
+        result = await db.execute(
+            select(Order)
+            .where(Order.customer_id == current_user.id)
+            .options(selectinload(Order.items))
+        )
         return result.scalars().all()
 
 @router.get("/orders/{id}", response_model=OrderResponse)
@@ -228,7 +272,12 @@ async def read_order(
     db: AsyncSession = Depends(get_db)
 ):
     """Retrieve details of a single order."""
-    result = await db.execute(select(Order).where(Order.id == id))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == id)
+        .options(selectinload(Order.items))
+    )
     order = result.scalars().first()
     
     if not order:
@@ -242,7 +291,10 @@ async def read_order(
         # Check if the farmer sells any item in this order
         farmer_item = False
         for item in order.items:
-            if item.crop_listing.farmer_id == current_user.id:
+            # Need to select crop listing explicitly or use selectinload
+            res_cl = await db.execute(select(CropListing).where(CropListing.id == item.crop_listing_id))
+            cl = res_cl.scalars().first()
+            if cl and cl.farmer_id == current_user.id:
                 farmer_item = True
                 break
         if not farmer_item:
@@ -260,8 +312,14 @@ async def update_order_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Update order status. Farmers or Admins can ship/complete; Customers can cancel pending."""
-    result = await db.execute(select(Order).where(Order.id == id).with_for_update())
+    """Update order status with state-machine verification."""
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == id)
+        .options(selectinload(Order.items))
+        .with_for_update()
+    )
     order = result.scalars().first()
     
     if not order:
@@ -270,41 +328,87 @@ async def update_order_status(
             detail="Order not found."
         )
         
+    current_status = order.status.lower()
     target_status = payload.status.lower()
     
-    if target_status not in ["pending", "shipped", "completed", "cancelled"]:
+    # State Machine Transitions check
+    if current_status == target_status:
+        return order
+        
+    if current_status in ["completed", "rejected", "cancelled"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid target status."
+            detail=f"Cannot transition order from terminal state '{current_status}'"
+        )
+        
+    # Allowed transition matrix
+    allowed_transitions = {
+        "pending": ["accepted", "rejected", "cancelled"],
+        "accepted": ["ready", "cancelled"],
+        "ready": ["completed", "cancelled"]
+    }
+    
+    if target_status not in allowed_transitions.get(current_status, []):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid transition from '{current_status}' to '{target_status}'"
         )
         
     # Permissions check
     if current_user.role == "admin":
-        order.status = target_status
+        pass
     elif current_user.role == "farmer":
-        # Check if the farmer owns items in this order
-        owns_items = any(item.crop_listing.farmer_id == current_user.id for item in order.items)
-        if not owns_items:
-            raise HTTPException(status_code=403, detail="Not authorized to update this order.")
-            
-        # Farmer can ship, complete, or cancel
-        order.status = target_status
-    else:
-        # Customer can only cancel their own order if it is still pending
-        if order.customer_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Not authorized.")
-        if target_status != "cancelled":
-            raise HTTPException(status_code=400, detail="Customers can only cancel orders.")
-        if order.status != "pending":
-            raise HTTPException(status_code=400, detail="Only pending orders can be cancelled.")
-        
-        # Restore stock if cancelled
+        owns_items = False
         for item in order.items:
-            item.crop_listing.available_quantity += item.quantity
+            res_cl = await db.execute(select(CropListing).where(CropListing.id == item.crop_listing_id))
+            cl = res_cl.scalars().first()
+            if cl and cl.farmer_id == current_user.id:
+                owns_items = True
+                break
+        if not owns_items:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this order."
+            )
+        # Farmer cannot cancel order unless they reject it, but can accept/ready/complete/reject
+        if target_status == "cancelled":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Farmers cannot cancel customer orders; they must reject them instead."
+            )
+    else: # Customer
+        if order.customer_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to modify this order."
+            )
+        if target_status != "cancelled":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Customers can only transition orders to 'cancelled'."
+            )
             
-        order.status = "cancelled"
-        
+    # If transitioning to rejected or cancelled, restore listing stock
+    if target_status in ["rejected", "cancelled"]:
+        for item in order.items:
+            # Query the crop listing and lock it to update stock
+            l_res = await db.execute(
+                select(CropListing).where(CropListing.id == item.crop_listing_id).with_for_update()
+            )
+            listing = l_res.scalars().first()
+            if listing:
+                listing.available_quantity += item.quantity
+                if listing.status == "sold_out":
+                    listing.status = "active"
+                    
+    order.status = target_status
     await db.commit()
-    await db.refresh(order)
-    return order
+    
+    # Reload order to return eager items
+    res_reload = await db.execute(
+        select(Order)
+        .where(Order.id == order.id)
+        .options(selectinload(Order.items))
+    )
+    return res_reload.scalars().first()
 
