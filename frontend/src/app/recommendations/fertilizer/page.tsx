@@ -37,7 +37,7 @@ export default function FertilizerRecommendationPage() {
     formState: { errors },
     reset,
   } = useForm<FertilizerFormValues>({
-    resolver: zodResolver(fertilizerFormSchema),
+    resolver: zodResolver(fertilizerFormSchema as any),
     defaultValues: {
       nitrogen: 50,
       phosphorus: 50,

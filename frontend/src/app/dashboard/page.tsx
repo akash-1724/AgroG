@@ -10,6 +10,7 @@ import {
 
 import { useAuth } from "@/components/shared/auth-context";
 import { api } from "@/lib/api";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

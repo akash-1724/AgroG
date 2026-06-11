@@ -47,7 +47,7 @@ export default function RegisterPage() {
     watch,
     formState: { errors },
   } = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(registerSchema as any),
     defaultValues: {
       role: "customer"
     }

@@ -36,7 +36,7 @@ export default function CropRecommendationPage() {
     formState: { errors },
     reset,
   } = useForm<CropFormValues>({
-    resolver: zodResolver(cropFormSchema),
+    resolver: zodResolver(cropFormSchema as any),
     defaultValues: {
       nitrogen: 50,
       phosphorus: 50,

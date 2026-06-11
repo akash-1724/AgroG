@@ -32,7 +32,7 @@ export default function LoginPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchema as any),
   });
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -42,9 +42,12 @@ export default function LoginPage() {
       await login(response.data);
       toast("Login successful!", "success");
       
-      // Redirect based on role
       const role = response.data.role || "customer";
-      router.push(`/${role}/dashboard`);
+      if (role === "farmer") {
+        router.push("/farmer/listings");
+      } else {
+        router.push("/marketplace");
+      }
     } catch (error: any) {
       const msg = error.response?.data?.detail || "Login failed. Check your credentials.";
       toast(msg, "error");

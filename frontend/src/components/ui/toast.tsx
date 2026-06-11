@@ -12,7 +12,10 @@ export interface Toast {
 }
 
 interface ToastContextType {
-  toast: (message: string, type?: ToastType) => void;
+  toast: (
+    message: string | { title?: string; description?: string; variant?: "default" | "destructive" },
+    type?: ToastType
+  ) => void;
 }
 
 const ToastContext = React.createContext<ToastContextType | undefined>(undefined);
@@ -20,9 +23,19 @@ const ToastContext = React.createContext<ToastContextType | undefined>(undefined
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<Toast[]>([]);
 
-  const toast = React.useCallback((message: string, type: ToastType = "info") => {
+  const toast = React.useCallback((msgOrObj: string | { title?: string; description?: string; variant?: "default" | "destructive" }, type: ToastType = "info") => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type }]);
+    let finalMessage = "";
+    let finalType = type;
+
+    if (typeof msgOrObj === "string") {
+      finalMessage = msgOrObj;
+    } else {
+      finalMessage = `${msgOrObj.title ? msgOrObj.title + ": " : ""}${msgOrObj.description || ""}`;
+      finalType = msgOrObj.variant === "destructive" ? "error" : "success";
+    }
+
+    setToasts((prev) => [...prev, { id, message: finalMessage, type: finalType }]);
     
     // Auto-remove after 4 seconds
     setTimeout(() => {
