@@ -2,33 +2,25 @@
 
 ## Purpose
 Initial definition of the identity and authentication capability for AgroGuide.
-
 ## Requirements
-
 ### Requirement: User Registration and Profile Creation
-The system SHALL allow users to register with an email, password, full name, phone number, and a role (Farmer, Customer, or Admin).
+The system SHALL allow users to register with an email, password, full name, phone number, and a role (farmer or customer). Farmer registration SHALL automatically initialize a corresponding empty FarmerProfile record in the database. Customer registration SHALL NOT require farmer fields. Public registration of Admin accounts is strictly prohibited.
 
 #### Scenario: Successful Farmer Registration
-- **WHEN** a user registers with valid Farmer details and password
-- **THEN** the system SHALL create the user record, default their status to active, and return a success message
+- **WHEN** a user registers with valid farmer details, role, and password
+- **THEN** the system SHALL create the user record, initialize a FarmerProfile mapping to their user ID, and return a success message
 
 ### Requirement: JWT User Authentication
-The system SHALL authenticate registered users using JWT access and refresh tokens.
+The system SHALL authenticate registered users using short-lived JWT access tokens and database-persisted, revocable refresh tokens. The system SHALL support access token regeneration via valid refresh tokens and revoke refresh tokens upon logout requests.
 
 #### Scenario: Successful Email and Password Login
 - **WHEN** a user logs in with correct email and password credentials
-- **THEN** the system SHALL return a short-lived JWT access token and a long-lived JWT refresh token
-
-### Requirement: Google OAuth Authentication
-The system SHALL support Google OAuth 2.0 login and register users automatically if their email does not already exist.
-
-#### Scenario: Login with Valid Google Account
-- **WHEN** a user successfully authenticates via Google OAuth
-- **THEN** the system SHALL return JWT access and refresh tokens associated with that email
+- **THEN** the system SHALL create a RefreshToken record in the database, return a short-lived JWT access token, and return a long-lived JWT refresh token
 
 ### Requirement: Role-Based Access Control
-The system SHALL enforce Role-Based Access Control (RBAC) on all protected API endpoints and frontend routes.
+The system SHALL enforce Role-Based Access Control (RBAC) on all protected API endpoints, restricting access to authorized roles (farmer, customer, admin).
 
 #### Scenario: Farmer Accessing Marketplace Inventory
-- **WHEN** an authenticated user with the role 'Farmer' requests a Farmer-only endpoint
+- **WHEN** an authenticated user with the role 'farmer' requests a farmer-only endpoint
 - **THEN** the system SHALL authorize the request and return the resource data
+
