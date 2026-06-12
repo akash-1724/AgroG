@@ -40,7 +40,4 @@ class Settings(BaseSettings):
     # Cloudinary Integration
     CLOUDINARY_URL: str = Field(default="")
 
-    # Sentry DSN
-    SENTRY_DSN: str = Field(default="")
-
 settings = Settings()
