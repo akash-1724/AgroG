@@ -397,16 +397,23 @@ async def update_order_status(
         pass
     elif current_user.role == "farmer":
         owns_items = False
+        has_other_farmer_items = False
         for item in order.items:
             res_cl = await db.execute(select(CropListing).where(CropListing.id == item.crop_listing_id))
             cl = res_cl.scalars().first()
             if cl and cl.farmer_id == current_user.id:
                 owns_items = True
-                break
+            else:
+                has_other_farmer_items = True
         if not owns_items:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to update this order."
+            )
+        if has_other_farmer_items:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Farmers cannot update multi-farmer order status."
             )
         # Farmer cannot cancel order unless they reject it, but can accept/ready/complete/reject
         if target_status == "cancelled":
@@ -471,4 +478,3 @@ async def update_order_status(
         }
         
     return reloaded_order
-

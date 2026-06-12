@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.api.deps import get_current_user, RoleChecker
+from app.core.config import settings
 from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token, hash_refresh_token
 from app.models.user import User, FarmerProfile
 from app.models.auth import RefreshToken
@@ -387,4 +388,3 @@ async def admin_only_test(current_user: User = Depends(RoleChecker(allowed_roles
         "status": "authorized",
         "message": f"Hello Admin {current_user.full_name}, you have accessed a role-protected resource."
     }
-
