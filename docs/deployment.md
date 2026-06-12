@@ -45,8 +45,8 @@ Render and Railway provide free/hobby tiers that support running Docker containe
    - **Backend Environment Variables**:
      - `DATABASE_URL`: Connection string from your database host.
      - `REDIS_URL`: Connection string from your Redis host.
-     - `SECRET_KEY`: Long, randomly generated secure string for JWT tokens.
-     - `SENTRY_DSN` (Optional): DSN for error monitoring.
+     - `JWT_SECRET`: Long, randomly generated secure string for access tokens.
+     - `JWT_REFRESH_SECRET`: Separate long, randomly generated secure string for refresh tokens.
    - **ML Service Environment Variables**:
      - `ML_DEMO_MODE`: Set to `True` (or `False` if trained models are present).
      - `MAX_IMAGE_UPLOAD_MB`: `5` (limit upload file sizes).

@@ -178,7 +178,7 @@ export default function AssistantPage() {
             <span className="shrink-0 mt-0.5 text-base">⚠️</span>
             <div>
               <p className="font-bold text-amber-950">AI Provider Key Not Configured</p>
-              <p className="text-[10px] text-amber-800 font-medium mt-0.5">Running in rule-based baseline mock mode. Provide a valid Gemini/OpenAI API key to enable live LLM replies.</p>
+              <p className="text-[10px] text-amber-800 font-medium mt-0.5">Running in rule-based baseline mock mode. Provide a valid Gemini API key to enable live LLM replies.</p>
             </div>
           </div>
         )}

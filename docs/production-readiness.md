@@ -11,8 +11,8 @@ Ensure **all** production environments use real, secure, and uniquely generated 
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | Must use SSL (`sslmode=require`). Do not use pooler mode during Alembic migrations. |
 | `REDIS_URL` | Redis connection string | Must use secure protocol (`rediss://`). |
-| `SECRET_KEY` | JWT signing secret | Must be a secure 32+ character hex string (e.g., `openssl rand -hex 32`). |
-| `SENTRY_DSN` | Sentry integration DSN | Production-scoped DSN for real-time exception tracking. |
+| `JWT_SECRET` | JWT access-token signing secret | Must be a secure 32+ character hex string (e.g., `openssl rand -hex 32`). |
+| `JWT_REFRESH_SECRET` | JWT refresh-token signing secret | Must be different from `JWT_SECRET` and generated securely. |
 
 ### ML Service Secrets
 | Variable Name | Description | Production Requirement |

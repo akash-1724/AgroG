@@ -21,7 +21,7 @@ Before starting, copy the configuration template to initialize your local enviro
 cp .env.example .env
 ```
 
-Review `.env` and fill in API keys or Sentry details if using them in production.
+Review `.env` and fill in required API keys and service credentials for your environment.
 
 ---
 

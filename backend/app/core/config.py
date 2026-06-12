@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     # ML Service Settings
     ML_SERVICE_URL: str = Field(default="http://localhost:8001")
     GEMINI_API_KEY: str = Field(default="")
-    OPENAI_API_KEY: str = Field(default="")
 
     # Cloudinary Integration
     CLOUDINARY_URL: str = Field(default="")

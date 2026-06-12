@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,9 +58,53 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    toast("Google OAuth login triggered (simulation)", "info");
-  };
+  const handleGoogleCredentialResponse = React.useCallback(
+    async (response: any) => {
+      try {
+        const apiResponse = await api.post("/auth/google", {
+          id_token: response.credential,
+        });
+        await login(apiResponse.data);
+        toast("Google Login successful!", "success");
+
+        const role = apiResponse.data.role || "customer";
+        if (role === "farmer") {
+          router.push("/farmer/listings");
+        } else {
+          router.push("/marketplace");
+        }
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { detail?: string } } };
+        const msg = err.response?.data?.detail || "Google Login failed.";
+        toast(msg, "error");
+      }
+    },
+    [login, router, toast]
+  );
+
+  const initGoogleAuth = React.useCallback(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.warn("NEXT_PUBLIC_GOOGLE_CLIENT_ID is not defined in the environment");
+      return;
+    }
+
+    const google = (window as any).google;
+    if (google?.accounts?.id) {
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredentialResponse,
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("google-signin-btn"),
+        { theme: "outline", size: "large", width: "100%", text: "continue_with" }
+      );
+    }
+  }, [handleGoogleCredentialResponse]);
+
+  React.useEffect(() => {
+    initGoogleAuth();
+  }, [initGoogleAuth]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
@@ -104,9 +149,9 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full" onClick={handleGoogleLogin}>
-            Sign in with Google
-          </Button>
+          <div className="w-full flex justify-center min-h-[40px]">
+            <div id="google-signin-btn" className="w-full"></div>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-wrap items-center justify-center gap-1 text-sm">
           <span>Don&apos;t have an account?</span>
@@ -115,6 +160,11 @@ export default function LoginPage() {
           </Link>
         </CardFooter>
       </Card>
+      <Script
+        src="https://accounts.google.com/gsi/client"
+        onReady={initGoogleAuth}
+        strategy="lazyOnload"
+      />
     </div>
   );
 }
