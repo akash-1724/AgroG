@@ -15,6 +15,9 @@ def classify_plant_disease(image_bytes: bytes) -> dict:
     Loads leaf image bytes, resizes to standard input dimensions (224x224),
     extracts color features (mean RGB) to dynamically simulate ML classification.
     """
+    disclaimer = "Advisory only. Consult a certified horticulturist or agricultural extension office before using pesticide chemicals."
+    limitations = "Diagnosis simulated via color-heuristics baseline. No neural network was executed."
+    
     try:
         # Load and verify image
         image = Image.open(io.BytesIO(image_bytes))
@@ -38,7 +41,10 @@ def classify_plant_disease(image_bytes: bytes) -> dict:
         return {
             "predicted_disease": selected["label"],
             "confidence": round(confidence, 4),
-            "remedy": selected["remedy"]
+            "remedy": selected["remedy"],
+            "model_status": "demo",
+            "disclaimer": disclaimer,
+            "limitations": limitations
         }
     except Exception as e:
         print(f"Image processing error: {e}")
@@ -46,5 +52,8 @@ def classify_plant_disease(image_bytes: bytes) -> dict:
         return {
             "predicted_disease": "Healthy Leaf",
             "confidence": 1.0000,
-            "remedy": "No disease detected. Continue normal crop care."
+            "remedy": "No disease detected. Continue normal crop care.",
+            "model_status": "demo",
+            "disclaimer": disclaimer,
+            "limitations": limitations
         }

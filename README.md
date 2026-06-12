@@ -89,21 +89,37 @@ Once services are running, you can verify their status:
  
 ---
 
-## Integration & RBAC Verification Tests
+## Running Automated Tests (Pytest Suites)
+
+AgroGuide comes with comprehensive automated test suites using `pytest`.
+
+### 1. Run Backend Tests
+To test user authentication, RBAC authorizations, listings, orders, nearby farmer discoveries, and assistant fallbacks:
+```bash
+cd backend
+PYTHONPATH=. ../venv/bin/pytest app/tests/test_backend.py
+```
+
+### 2. Run ML Service Tests
+To test crop/fertilizer inputs validations, model status loaded states, 5MB limits, and classifier fallbacks:
+```bash
+cd ml_service
+PYTHONPATH=. ../venv/bin/pytest tests/test_ml.py
+```
+
+---
+
+## Integration & Verification Scripts (Docker/Local)
 
 You can run automated integration testing scripts to verify database relationships, authentication state-machines, and Role-Based Access Control logic:
 
 ### 1. Verify Authentication & RBAC
-
-Verifies registration rules, JWT login exchanges, profile context lookup, role access restrictions, token refreshes, and database token revocation:
 ```bash
 docker compose exec backend python verify_auth.py
 # Or locally inside /backend: python verify_auth.py
 ```
 
 ### 2. Verify Marketplace Listings & Orders
-
-Verifies listing creation, query search parameters, transactional stock checks, item snapshots, role-protected status transitions, and stock recovery paths:
 ```bash
 docker compose exec backend python verify_marketplace.py
 # Or locally inside /backend: python verify_marketplace.py

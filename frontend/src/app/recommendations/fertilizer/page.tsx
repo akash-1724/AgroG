@@ -29,6 +29,9 @@ export default function FertilizerRecommendationPage() {
     recommended_fertilizer: string;
     guideline: string;
   } | null>(null);
+  const [modelStatus, setModelStatus] = React.useState<string | null>(null);
+  const [disclaimer, setDisclaimer] = React.useState<string | null>(null);
+  const [limitations, setLimitations] = React.useState<string | null>(null);
 
   const {
     register,
@@ -56,6 +59,9 @@ export default function FertilizerRecommendationPage() {
         recommended_fertilizer: data.recommended_fertilizer,
         guideline: data.guideline,
       });
+      setModelStatus(data.model_status || "demo");
+      setDisclaimer(data.disclaimer || "");
+      setLimitations(data.limitations || "");
       toast({
         title: "Analysis Complete",
         description: "Fertilizer prescription generated successfully.",
@@ -79,6 +85,9 @@ export default function FertilizerRecommendationPage() {
   const handleReset = () => {
     reset();
     setRecommendation(null);
+    setModelStatus(null);
+    setDisclaimer(null);
+    setLimitations(null);
   };
 
   return (
@@ -198,6 +207,16 @@ export default function FertilizerRecommendationPage() {
                 </div>
               ) : recommendation ? (
                 <div className="w-full text-left space-y-5">
+                  {modelStatus === "demo" && (
+                    <div className="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-semibold flex items-start gap-2">
+                      <span className="shrink-0 mt-0.5 text-base">⚠️</span>
+                      <div>
+                        <p className="font-bold text-amber-950">Baseline Demo Mode Active</p>
+                        <p className="text-[10px] text-amber-800 font-medium mt-0.5">NPK recommendation generated via rule-based heuristic calculations.</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <h3 className="text-xs font-extrabold text-muted-foreground tracking-wider uppercase mb-1">
                       Recommended Fertilizer Formula
@@ -219,6 +238,19 @@ export default function FertilizerRecommendationPage() {
                       {recommendation.guideline}
                     </p>
                   </div>
+
+                  {disclaimer && (
+                    <div className="p-3 bg-red-50/50 border border-red-200/50 rounded-lg text-[10px] text-red-800 font-medium">
+                      <strong className="text-red-950 uppercase text-[8px] tracking-wider block mb-0.5">⚠️ Chemical Safety Warning:</strong>
+                      {disclaimer}
+                    </div>
+                  )}
+
+                  {limitations && (
+                    <div className="text-[10px] text-slate-400 pl-1">
+                      Limitations: {limitations}
+                    </div>
+                  )}
 
                   <div className="text-xs text-muted-foreground italic">
                     Tip: For best absorption, apply before light watering or right before expected mild rainfall.

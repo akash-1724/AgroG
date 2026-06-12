@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, status
 from pydantic import BaseModel, Field
 import sentry_sdk
 from ml_service.utils.model_loader import model_loader
@@ -14,35 +14,62 @@ if sentry_dsn:
 
 app = FastAPI(title="AgroGuide ML Service", version="1.0.0")
 
-# Request Schemas
+# Request Schemas with explicit bounds validation
 class CropRecommendationInput(BaseModel):
-    nitrogen: float = Field(..., description="Soil Nitrogen level (N)")
-    phosphorus: float = Field(..., description="Soil Phosphorus level (P)")
-    potassium: float = Field(..., description="Soil Potassium level (K)")
-    ph: float = Field(..., description="Soil pH level")
-    temperature: float = Field(..., description="Local Temperature in Celsius")
-    humidity: float = Field(..., description="Local relative Humidity percentage")
-    rainfall: float = Field(..., description="Average Rainfall in mm")
+    nitrogen: float = Field(..., ge=0.0, le=200.0, description="Soil Nitrogen level (N) in ppm")
+    phosphorus: float = Field(..., ge=0.0, le=200.0, description="Soil Phosphorus level (P) in ppm")
+    potassium: float = Field(..., ge=0.0, le=200.0, description="Soil Potassium level (K) in ppm")
+    ph: float = Field(..., ge=3.5, le=9.0, description="Soil pH level")
+    temperature: float = Field(..., ge=0.0, le=50.0, description="Local Temperature in Celsius")
+    humidity: float = Field(..., ge=10.0, le=100.0, description="Local relative Humidity percentage")
+    rainfall: float = Field(..., ge=10.0, le=500.0, description="Average Rainfall in mm")
 
 class FertilizerRecommendationInput(BaseModel):
-    nitrogen: float = Field(..., description="Soil Nitrogen ratio (N)")
-    phosphorus: float = Field(..., description="Soil Phosphorus ratio (P)")
-    potassium: float = Field(..., description="Soil Potassium ratio (K)")
+    nitrogen: float = Field(..., ge=0.0, le=200.0, description="Soil Nitrogen ratio (N)")
+    phosphorus: float = Field(..., ge=0.0, le=200.0, description="Soil Phosphorus ratio (P)")
+    potassium: float = Field(..., ge=0.0, le=200.0, description="Soil Potassium ratio (K)")
 
 @app.get("/")
 def read_root():
     return {
         "status": "ML Service online",
-        "crop_model_loaded": model_loader.crop_model is not None,
-        "fertilizer_model_loaded": model_loader.fertilizer_model is not None
+        "demo_mode_active": model_loader.demo_mode,
+        "crop_model_status": model_loader.crop_status,
+        "fertilizer_model_status": model_loader.fertilizer_status,
+        "disease_model_status": model_loader.disease_status
     }
 
 @app.get("/health")
 def health_check():
     return {
         "status": "healthy",
-        "crop_model_loaded": model_loader.crop_model is not None,
-        "fertilizer_model_loaded": model_loader.fertilizer_model is not None
+        "demo_mode": model_loader.demo_mode,
+        "crop_model": model_loader.crop_status,
+        "fertilizer_model": model_loader.fertilizer_status,
+        "disease_model": model_loader.disease_status
+    }
+
+@app.get("/model-status")
+def get_model_status():
+    """Reports the explicit state of ML model artifacts and fallbacks."""
+    return {
+        "demo_mode": model_loader.demo_mode,
+        "models": {
+            "crop_recommendation": {
+                "status": model_loader.crop_status,
+                "configured_path": model_loader.crop_path,
+                "type": "XGBoost Classifier"
+            },
+            "fertilizer_recommendation": {
+                "status": model_loader.fertilizer_status,
+                "configured_path": model_loader.fertilizer_path,
+                "type": "Decision Tree Classifier"
+            },
+            "disease_detection": {
+                "status": model_loader.disease_status,
+                "type": "Color Heuristic Baseline Classifier"
+            }
+        }
     }
 
 @app.post("/recommendations/crop")
@@ -57,8 +84,14 @@ async def recommend_crop(payload: CropRecommendationInput):
         payload.humidity,
         payload.rainfall
     ]
-    predictions = model_loader.predict_crop(features)
-    return {"recommendations": predictions}
+    predictions, status_code = model_loader.predict_crop(features)
+    
+    return {
+        "recommendations": predictions,
+        "model_status": status_code,
+        "disclaimer": "Advisory only. Always consult with local certified agricultural extension workers before seeding.",
+        "limitations": "ML predictions are statistical approximations trained on general climate zones."
+    }
 
 @app.post("/recommendations/fertilizer")
 async def recommend_fertilizer(payload: FertilizerRecommendationInput):
@@ -68,33 +101,47 @@ async def recommend_fertilizer(payload: FertilizerRecommendationInput):
         payload.phosphorus,
         payload.potassium
     ]
-    fertilizer = model_loader.predict_fertilizer(features)
+    fertilizer, status_code = model_loader.predict_fertilizer(features)
+    
     return {
         "recommended_fertilizer": fertilizer,
-        "guideline": f"Based on your N={payload.nitrogen}, P={payload.phosphorus}, K={payload.potassium} ratios, apply {fertilizer} as recommended."
+        "model_status": status_code,
+        "guideline": f"Based on your N={payload.nitrogen}, P={payload.phosphorus}, K={payload.potassium} ratios, apply {fertilizer} as recommended.",
+        "disclaimer": "Advisory warning: Applying high concentration chemicals without soil test confirmation may degrade soil quality.",
+        "limitations": "Formulations are generated using a heuristic diagnostic baseline."
     }
 
 @app.post("/disease/detect")
 async def detect_disease(file: UploadFile = File(...)):
     """
     Receives leaf image files and returns predicted disease, confidence level, and remedy.
-    WARNING: Runs standard color-channel pixel statistics helper heuristics for baseline testing.
-    This is non-production code.
+    Enforces format and size limits.
     """
     # Validate file format
     if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
         raise HTTPException(
-            status_code=400,
-            detail="Invalid image type. Only JPEG and PNG are supported."
-        )
-        
-    try:
-        content = await file.read()
-        prediction = classify_plant_disease(content)
-        return prediction
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error running plant disease detection: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid image type. Only JPEG, JPG and PNG are supported."
         )
 
+    # Validate file size (max upload size from environment in MB, default to 5MB)
+    max_mb = int(os.environ.get("MAX_IMAGE_UPLOAD_MB", "5"))
+    max_bytes = max_mb * 1024 * 1024
+
+    try:
+        content = await file.read()
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Image file size exceeds limit of {max_mb}MB."
+            )
+            
+        prediction = classify_plant_disease(content)
+        return prediction
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error running plant disease detection: {str(e)}"
+        )

@@ -36,6 +36,9 @@ async def get_crop_recommendation(
     cached_data = await get_json_cache(cache_key)
     if cached_data:
         recommended_crops = cached_data
+        model_status = "demo"
+        disclaimer = "Cached Result. Run parameters again to fetch fresh advisory status."
+        limitations = ""
     else:
         # Fetch from ML service
         async with httpx.AsyncClient() as client:
@@ -50,7 +53,11 @@ async def get_crop_recommendation(
                         status_code=status.HTTP_502_BAD_GATEWAY,
                         detail="ML service returned an error."
                     )
-                recommended_crops = response.json().get("recommendations", [])
+                res_data = response.json()
+                recommended_crops = res_data.get("recommendations", [])
+                model_status = res_data.get("model_status", "demo")
+                disclaimer = res_data.get("disclaimer", "")
+                limitations = res_data.get("limitations", "")
             except httpx.RequestError as e:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -86,8 +93,11 @@ async def get_crop_recommendation(
         temperature=new_record.temperature,
         humidity=new_record.humidity,
         rainfall=new_record.rainfall,
-        recommended_crops=recommended_crops,
-        created_at=new_record.created_at
+        recommended_crops=[(c["crop"] if isinstance(c, dict) else c) for c in recommended_crops],
+        created_at=new_record.created_at,
+        model_status=model_status,
+        disclaimer=disclaimer,
+        limitations=limitations
     )
 
 @router.post("/fertilizer", response_model=FertilizerRecommendationResponse)
@@ -105,11 +115,14 @@ async def get_fertilizer_recommendation(
     cached_data = await get_json_cache(cache_key)
     if cached_data:
         recommended_fertilizer = cached_data
+        model_status = "demo"
+        disclaimer = "Cached Result. Run parameters again to fetch fresh advisory status."
+        limitations = ""
     else:
         # Fetch from ML service
         async with httpx.AsyncClient() as client:
             try:
-                # ML service doesn't take crop_type, it just takes nitrogen, phosphorus, potassium
+                # Target crop is unused in heuristic model but used in logs
                 response = await client.post(
                     f"{settings.ML_SERVICE_URL}/recommendations/fertilizer",
                     json={
@@ -124,7 +137,11 @@ async def get_fertilizer_recommendation(
                         status_code=status.HTTP_502_BAD_GATEWAY,
                         detail="ML service returned an error."
                     )
-                recommended_fertilizer = response.json().get("recommended_fertilizer", "10-26-26")
+                res_data = response.json()
+                recommended_fertilizer = res_data.get("recommended_fertilizer", "NPK-19-19-19")
+                model_status = res_data.get("model_status", "demo")
+                disclaimer = res_data.get("disclaimer", "")
+                limitations = res_data.get("limitations", "")
             except httpx.RequestError as e:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -147,7 +164,18 @@ async def get_fertilizer_recommendation(
     await db.commit()
     await db.refresh(new_record)
     
-    return new_record
+    return FertilizerRecommendationResponse(
+        id=new_record.id,
+        nitrogen=new_record.nitrogen,
+        phosphorus=new_record.phosphorus,
+        potassium=new_record.potassium,
+        crop_type=new_record.crop_type,
+        recommended_fertilizer=new_record.recommended_fertilizer,
+        created_at=new_record.created_at,
+        model_status=model_status,
+        disclaimer=disclaimer,
+        limitations=limitations
+    )
 
 @router.get("/history/crop", response_model=List[CropRecommendationResponse])
 async def get_crop_history(
@@ -242,5 +270,15 @@ async def detect_disease(
     await db.commit()
     await db.refresh(new_record)
 
-    return new_record
+    return DiseaseDetectionResponse(
+        id=new_record.id,
+        image_url=new_record.image_url,
+        predicted_disease=new_record.predicted_disease,
+        confidence=new_record.confidence,
+        remedy=new_record.remedy,
+        created_at=new_record.created_at,
+        model_status=result.get("model_status", "demo"),
+        disclaimer=result.get("disclaimer", ""),
+        limitations=result.get("limitations", "")
+    )
 

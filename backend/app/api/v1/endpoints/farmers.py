@@ -1,48 +1,89 @@
 import uuid
+import math
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from pydantic import BaseModel
+from sqlalchemy import text, select
 
 from app.core.database import get_db
+from app.api.deps import get_current_user, RoleChecker
+from app.models.user import User, FarmerProfile
+from app.schemas.farmers import FarmerLocationUpdate, NearbyFarmerResponse
 
 router = APIRouter()
 
-# Response Schema for Farmer Search with Distance
-class FarmerSearchResponse(BaseModel):
-    user_id: uuid.UUID
-    farm_name: str
-    latitude: float
-    longitude: float
-    address: str
-    description: Optional[str] = None
-    rating: float
-    distance_km: float
+farmer_guard = RoleChecker(allowed_roles=["farmer"])
 
-    class Config:
-        from_attributes = True
+@router.patch("/me/location", response_model=NearbyFarmerResponse)
+async def update_my_location(
+    payload: FarmerLocationUpdate,
+    current_user: User = Depends(farmer_guard),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Allow farmers to create or update their own location details.
+    Enforces that authenticated farmer updates only their own profile.
+    """
+    # Load profile
+    result = await db.execute(select(FarmerProfile).where(FarmerProfile.user_id == current_user.id))
+    profile = result.scalars().first()
+    
+    if not profile:
+        # If farmer profile doesn't exist, create it
+        profile = FarmerProfile(user_id=current_user.id)
+        db.add(profile)
 
-@router.get("/search", response_model=List[FarmerSearchResponse])
-async def search_farmers(
-    lat: float = Query(..., description="Target Latitude of center coordinate"),
-    lon: float = Query(..., description="Target Longitude of center coordinate"),
+    profile.latitude = payload.latitude
+    profile.longitude = payload.longitude
+    profile.address = payload.address
+    profile.district = payload.district
+    profile.city = payload.city
+    profile.state = payload.state
+    profile.location_visibility = payload.location_visibility
+    
+    await db.commit()
+    await db.refresh(profile)
+    
+    # Return response with raw coordinates for the owner
+    return NearbyFarmerResponse(
+        farmer_id=profile.user_id,
+        full_name=current_user.full_name,
+        farm_name=profile.farm_name,
+        latitude=profile.latitude,
+        longitude=profile.longitude,
+        address=profile.address,
+        district=profile.district,
+        city=profile.city,
+        state=profile.state,
+        distance_km=0.0,
+        rating=profile.rating
+    )
+
+@router.get("/nearby", response_model=List[NearbyFarmerResponse])
+async def get_nearby_farmers(
+    lat: float = Query(..., description="Target Latitude"),
+    lon: float = Query(..., description="Target Longitude"),
     radius: float = Query(10.0, description="Proximity search radius in kilometers"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Search for farmers within a specific radius of geo-coordinates.
-    Calculates distance using the Haversine formula in SQL.
+    Discover nearby active farmers within a specific radius of geo-coordinates.
+    Suppresses exact latitude/longitude coordinates, rounding to 2 decimal places.
+    Filters out locations where location_visibility is false.
     """
-    # 6371 represents Earth's radius in kilometers
-    # We use a bounding box check first to reduce CPU overhead of acos
     # 1 degree of latitude is roughly 111 km
-    import math
     lat_delta = radius / 111.0
-    lon_delta = radius / (111.0 * abs(float(math.cos(math.radians(lat)))) if lat != 90 and lat != -90 else 1.0)
     
-    # SQL query with Haversine formula. To prevent math domain error when cos calculation is slightly > 1,
-    # we use least/greatest or simple acos bounds handling in SQL.
+    # Pre-calculate bounding box in Python
+    min_lat = lat - lat_delta
+    max_lat = lat + lat_delta
+    
+    # Avoid zero division or cosine calculations at poles
+    cos_lat = math.cos(math.radians(lat))
+    lon_factor = 111.32 * cos_lat if abs(lat) < 89.9 else 1.0
+    min_lon = lon - (radius / lon_factor)
+    max_lon = lon + (radius / lon_factor)
+    
     haversine_formula = """
         (6371 * acos(
             least(1.0, greatest(-1.0, 
@@ -54,23 +95,17 @@ async def search_farmers(
     """
     
     query = text(f"""
-        SELECT user_id, farm_name, latitude, longitude, address, description, rating,
-        {haversine_formula} AS distance
-        FROM farmer_profiles
-        WHERE latitude BETWEEN :min_lat AND :max_lat
-          AND longitude BETWEEN :min_lon AND :max_lon
+        SELECT fp.user_id, fp.farm_name, fp.latitude, fp.longitude, fp.address, 
+               fp.district, fp.city, fp.state, fp.rating, u.full_name,
+               {haversine_formula} AS distance
+        FROM farmer_profiles fp
+        JOIN users u ON fp.user_id = u.id
+        WHERE fp.latitude BETWEEN :min_lat AND :max_lat
+          AND fp.longitude BETWEEN :min_lon AND :max_lon
+          AND fp.location_visibility = true
           AND {haversine_formula} <= :radius
         ORDER BY distance ASC
     """)
-    
-    # Calculate bounding box values in Python
-    import math
-    min_lat = lat - lat_delta
-    max_lat = lat + lat_delta
-    
-    # Handle longitude wrap around or simple bounding
-    min_lon = lon - (radius / (111.32 * math.cos(math.radians(lat))))
-    max_lon = lon + (radius / (111.32 * math.cos(math.radians(lat))))
     
     result = await db.execute(query, {
         "lat": lat,
@@ -82,17 +117,24 @@ async def search_farmers(
         "max_lon": max_lon
     })
     
-    farmers = []
+    nearby_list = []
     for row in result.all():
-        farmers.append(FarmerSearchResponse(
-            user_id=row[0],
+        # Round coords to 2 decimal places to protect exact exact privacy (~1.1km blur)
+        rounded_lat = round(float(row[2]), 2) if row[2] is not None else 0.0
+        rounded_lon = round(float(row[3]), 2) if row[3] is not None else 0.0
+        
+        nearby_list.append(NearbyFarmerResponse(
+            farmer_id=row[0],
             farm_name=row[1],
-            latitude=row[2],
-            longitude=row[3],
+            latitude=rounded_lat,
+            longitude=rounded_lon,
             address=row[4],
-            description=row[5],
-            rating=row[6],
-            distance_km=round(float(row[7]), 2)
+            district=row[5],
+            city=row[6],
+            state=row[7],
+            rating=row[8],
+            full_name=row[9],
+            distance_km=round(float(row[10]), 2)
         ))
         
-    return farmers
+    return nearby_list

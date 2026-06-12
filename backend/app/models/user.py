@@ -36,8 +36,13 @@ class FarmerProfile(Base):
     latitude: Mapped[Optional[float]] = mapped_column(Double, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Double, nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    district: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    location_visibility: Mapped[bool] = mapped_column(default=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     rating: Mapped[float] = mapped_column(Float, default=5.0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="farmer_profile")

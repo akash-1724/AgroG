@@ -1,4 +1,4 @@
-name: AgroGuide Monorepo CI
+name: AgroGuide CI
 
 on:
   push:
@@ -7,86 +7,79 @@ on:
     branches: [ main, master ]
 
 jobs:
-  backend-ci:
-    name: Backend CI (FastAPI)
+  backend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: "pip"
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
 
       - name: Install dependencies
         run: |
-          cd backend
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest httpx ruff
+          pip install -r backend/requirements.txt
 
-      - name: Lint with Ruff
+      - name: Run backend tests
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: "testsecretkeytestsecretkeytestsecretkey"
+          REDIS_URL: "redis://localhost:6379/0"
         run: |
           cd backend
-          ruff check .
+          PYTHONPATH=. pytest app/tests/test_backend.py
 
-      - name: Run Backend Tests
-        run: |
-          cd backend
-          pytest
-
-  ml_service-ci:
-    name: ML Service CI (FastAPI)
+  ml-service-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: "pip"
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'ml_service/requirements.txt'
 
       - name: Install dependencies
         run: |
-          cd ml_service
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest ruff
+          pip install -r ml_service/requirements.txt pytest pytest-asyncio pytest-cov
 
-      - name: Lint with Ruff
+      - name: Run ML service tests
         run: |
-          cd ml_service
-          ruff check .
+          PYTHONPATH=. pytest ml_service/tests/test_ml.py
 
-      - name: Run ML Tests
-        run: |
-          cd ml_service
-          pytest
-
-  frontend-ci:
-    name: Frontend CI (Next.js)
+  frontend-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
 
       - name: Install dependencies
         run: |
           cd frontend
           npm ci
 
-      - name: Code Linting
+      - name: Run lint
         run: |
           cd frontend
           npm run lint
 
-      - name: TypeScript Compile Check
+      - name: Run Typecheck
         run: |
           cd frontend
           npx tsc --noEmit

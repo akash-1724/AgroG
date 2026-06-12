@@ -51,6 +51,10 @@ services:
       - "8001:8001"
     environment:
       - PYTHONUNBUFFERED=1
+      - CROP_MODEL_PATH=models/crop_xgb.json
+      - FERTILIZER_MODEL_PATH=models/fertilizer_dt.pkl
+      - ML_DEMO_MODE=True
+      - MAX_IMAGE_UPLOAD_MB=5
 
   frontend:
     build:

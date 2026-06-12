@@ -23,6 +23,9 @@ class CropRecommendationResponse(BaseModel):
     rainfall: float
     recommended_crops: List[str]
     created_at: datetime
+    model_status: Optional[str] = "demo"
+    disclaimer: Optional[str] = None
+    limitations: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -41,6 +44,9 @@ class FertilizerRecommendationResponse(BaseModel):
     crop_type: str
     recommended_fertilizer: str
     created_at: datetime
+    model_status: Optional[str] = "demo"
+    disclaimer: Optional[str] = None
+    limitations: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -52,6 +58,9 @@ class DiseaseDetectionResponse(BaseModel):
     confidence: float
     remedy: str
     created_at: datetime
+    model_status: Optional[str] = "demo"
+    disclaimer: Optional[str] = None
+    limitations: Optional[str] = None
 
     class Config:
         from_attributes = True

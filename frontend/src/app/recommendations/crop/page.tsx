@@ -29,6 +29,9 @@ type CropFormValues = z.infer<typeof cropFormSchema>;
 export default function CropRecommendationPage() {
   const { toast } = useToast();
   const [recommendations, setRecommendations] = React.useState<string[] | null>(null);
+  const [modelStatus, setModelStatus] = React.useState<string | null>(null);
+  const [disclaimer, setDisclaimer] = React.useState<string | null>(null);
+  const [limitations, setLimitations] = React.useState<string | null>(null);
 
   const {
     register,
@@ -54,7 +57,10 @@ export default function CropRecommendationPage() {
       return response.data;
     },
     onSuccess: (data) => {
-      setRecommendations(data.recommended_crops || data.recommendations || []);
+      setRecommendations(data.recommendations || data.recommended_crops || []);
+      setModelStatus(data.model_status || "demo");
+      setDisclaimer(data.disclaimer || "");
+      setLimitations(data.limitations || "");
       toast({
         title: "Analysis Complete",
         description: "Successfully processed soil and climate parameters.",
@@ -78,6 +84,9 @@ export default function CropRecommendationPage() {
   const handleReset = () => {
     reset();
     setRecommendations(null);
+    setModelStatus(null);
+    setDisclaimer(null);
+    setLimitations(null);
   };
 
   return (
@@ -188,25 +197,42 @@ export default function CropRecommendationPage() {
                 </div>
               ) : recommendations ? (
                 <div className="w-full text-left space-y-4">
+                  {modelStatus === "demo" && (
+                    <div className="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-semibold flex items-start gap-2">
+                      <span className="shrink-0 mt-0.5 text-base">⚠️</span>
+                      <div>
+                        <p className="font-bold text-amber-950">Baseline Demo Mode Active</p>
+                        <p className="text-[10px] text-amber-800 font-medium mt-0.5">Predictions are rule-based baseline mocks for local evaluation.</p>
+                      </div>
+                    </div>
+                  )}
+
                   <h3 className="text-sm font-extrabold text-muted-foreground tracking-wider uppercase">
                     Crops Ranked by AI Confidence
                   </h3>
                   <div className="space-y-3">
                     {recommendations.length > 0 ? (
-                      recommendations.map((crop, index) => (
-                        <div
-                          key={crop}
-                          className="flex items-center justify-between p-3 rounded-lg border border-primary/10 bg-primary/5 hover:bg-primary/10 transition-colors"
-                        >
-                          <span className="font-semibold text-foreground capitalize flex items-center gap-2">
-                            <span className="text-xs bg-primary/20 text-primary h-5 w-5 rounded-full flex items-center justify-center font-bold">
-                              {index + 1}
+                      recommendations.map((crop: any, index) => {
+                        const cropName = typeof crop === "string" ? crop : crop.crop;
+                        const probability = typeof crop === "object" && crop?.probability !== undefined ? crop.probability : null;
+                        
+                        return (
+                          <div
+                            key={cropName}
+                            className="flex items-center justify-between p-3 rounded-lg border border-primary/10 bg-primary/5 hover:bg-primary/10 transition-colors"
+                          >
+                            <span className="font-semibold text-foreground capitalize flex items-center gap-2">
+                              <span className="text-xs bg-primary/20 text-primary h-5 w-5 rounded-full flex items-center justify-center font-bold">
+                                {index + 1}
+                              </span>
+                              {cropName}
                             </span>
-                            {crop}
-                          </span>
-                          <span className="text-xs font-semibold text-emerald-600">Optimal Soil Affinity</span>
-                        </div>
-                      ))
+                            <span className="text-xs font-semibold text-emerald-600">
+                              {probability !== null ? `Confidence: ${(probability * 100).toFixed(1)}%` : "Optimal Soil Affinity"}
+                            </span>
+                          </div>
+                        );
+                      })
                     ) : (
                       <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg">
                         <AlertCircle className="h-5 w-5" />
@@ -214,6 +240,20 @@ export default function CropRecommendationPage() {
                       </div>
                     )}
                   </div>
+                  
+                  {disclaimer && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-500 italic mt-4 leading-normal">
+                      <strong className="text-slate-700 not-italic block uppercase text-[8px] tracking-wider mb-0.5">Disclaimer:</strong>
+                      {disclaimer}
+                    </div>
+                  )}
+
+                  {limitations && (
+                    <div className="text-[10px] text-slate-400 pl-1">
+                      Limitations: {limitations}
+                    </div>
+                  )}
+                  
                   <div className="pt-2 text-xs text-muted-foreground italic">
                     Note: Cross-reference this analysis with regional weather trends before purchasing seed stocks.
                   </div>
