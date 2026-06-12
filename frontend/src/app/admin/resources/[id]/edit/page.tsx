@@ -39,7 +39,6 @@ export default function EditResourcePage() {
   const {
     register,
     handleSubmit,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<ResourceFormValues>({

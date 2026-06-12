@@ -2,12 +2,11 @@
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, Sparkles, Loader2, RefreshCw, AlertTriangle, ShieldAlert, MessageCircle, Clock } from "lucide-react";
+import { Send, Sparkles, Loader2, AlertTriangle, ShieldAlert, MessageCircle, Clock } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button as UIButton } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 
 interface Message {
@@ -43,7 +42,7 @@ export default function AssistantPage() {
   });
 
   // Fetch details of active conversation (messages)
-  const { data: activeConvo, isLoading: messagesLoading } = useQuery<Conversation>({
+  const { data: activeConvo } = useQuery<Conversation>({
     queryKey: ["conversation", activeConversationId],
     queryFn: async () => {
       const response = await api.get(`/assistant/conversations/${activeConversationId}`);

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { 
-  User, LayoutDashboard, ShoppingBag, Sprout, BookOpen, 
+  LayoutDashboard, ShoppingBag, Sprout, BookOpen, 
   Plus, Check, X, Truck, LogOut, Loader2, Trash2 
 } from "lucide-react";
 
