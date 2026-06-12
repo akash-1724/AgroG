@@ -33,7 +33,7 @@ export default function ResourcesPage() {
   const { data: articles = [], isLoading, error } = useQuery<Article[]>({
     queryKey: ["articles", selectedCategory, selectedLanguage, search],
     queryFn: async () => {
-      const params: any = {};
+      const params: Record<string, string> = {};
       if (selectedCategory !== "All") params.category = selectedCategory.toLowerCase();
       if (selectedLanguage) params.language = selectedLanguage;
       if (search) params.search = search;
@@ -118,7 +118,7 @@ export default function ResourcesPage() {
           <BookOpen className="h-12 w-12 text-muted/40 mx-auto mb-3" />
           <h3 className="font-bold text-lg text-foreground">No Resources Found</h3>
           <p className="text-muted-foreground text-sm max-w-sm mx-auto mt-1">
-            We couldn't find any articles matching your search or filters.
+            We couldn&apos;t find any articles matching your search or filters.
           </p>
         </Card>
       ) : (

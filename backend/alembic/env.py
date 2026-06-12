@@ -14,9 +14,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from app.core.config import settings
 from app.models.base import Base
 from app.models.user import User, FarmerProfile
+from app.models.auth import RefreshToken
 from app.models.marketplace import CropListing, Order, OrderItem
 from app.models.recommendations import CropRecommendationRecord, FertilizerRecommendationRecord, DiseaseDetectionRecord
 from app.models.educational import EducationalArticle
+from app.models.assistant import AssistantConversation, AssistantMessage
 
 # This is the Alembic Config object
 config = context.config

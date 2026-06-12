@@ -32,7 +32,7 @@ export default function LoginPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema as any),
+    resolver: zodResolver(loginSchema as unknown as Parameters<typeof zodResolver>[0]),
   });
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -48,8 +48,9 @@ export default function LoginPage() {
       } else {
         router.push("/marketplace");
       }
-    } catch (error: any) {
-      const msg = error.response?.data?.detail || "Login failed. Check your credentials.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      const msg = err.response?.data?.detail || "Login failed. Check your credentials.";
       toast(msg, "error");
     } finally {
       setIsSubmitting(false);

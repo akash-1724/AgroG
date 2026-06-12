@@ -40,7 +40,7 @@ export default function FertilizerRecommendationPage() {
     formState: { errors },
     reset,
   } = useForm<FertilizerFormValues>({
-    resolver: zodResolver(fertilizerFormSchema as any),
+    resolver: zodResolver(fertilizerFormSchema as unknown as Parameters<typeof zodResolver>[0]),
     defaultValues: {
       nitrogen: 50,
       phosphorus: 50,
@@ -68,8 +68,8 @@ export default function FertilizerRecommendationPage() {
         variant: "default",
       });
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "ML model recommendation failed.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "ML model recommendation failed.";
       toast({
         title: "Recommendation Failed",
         description: errMsg,
@@ -97,7 +97,7 @@ export default function FertilizerRecommendationPage() {
           <Droplet className="h-8 w-8 text-primary" /> Fertilizer Recommendation System
         </h1>
         <p className="text-muted-foreground mt-1">
-          Provide your soil's NPK values along with the target crop to generate a customized fertilizer formula.
+          Provide your soil&apos;s NPK values along with the target crop to generate a customized fertilizer formula.
         </p>
       </div>
 

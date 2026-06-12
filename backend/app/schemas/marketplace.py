@@ -75,6 +75,19 @@ class OrderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# Schema for farmer-specific order response to prevent leaking other farmers' items
+class FarmerOrderResponse(BaseModel):
+    id: uuid.UUID
+    customer_id: uuid.UUID
+    status: str
+    total_amount: float  # Calculated only from the items belonging to this farmer
+    items: List[OrderItemResponse]  # Filtered to include only items belonging to this farmer
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # Schema for updating order status
 class OrderStatusUpdate(BaseModel):
     status: str = Field(..., pattern="^(pending|accepted|rejected|ready|completed|cancelled)$", description="Target status")

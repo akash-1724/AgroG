@@ -61,8 +61,8 @@ function FarmerListingsContent() {
       toast("Listing deleted successfully.", "success");
       queryClient.invalidateQueries({ queryKey: ["farmerListings"] });
     },
-    onError: (err: any) => {
-      const msg = err.response?.data?.detail || "Failed to delete listing.";
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to delete listing.";
       toast(msg, "error");
     }
   });

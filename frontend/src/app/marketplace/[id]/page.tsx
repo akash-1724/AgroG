@@ -56,8 +56,8 @@ export default function ListingDetailPage() {
       });
       router.push("/marketplace");
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "Failed to place order. Please try again.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to place order. Please try again.";
       toast({
         title: "Order Failed",
         description: errMsg,

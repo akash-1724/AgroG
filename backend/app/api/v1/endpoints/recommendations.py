@@ -110,7 +110,7 @@ async def get_fertilizer_recommendation(
     Get fertilizer recommendations based on soil metrics.
     Caches predictions using Redis. Saves records to Postgres if user is authenticated.
     """
-    cache_key = f"fert_rec:{round(payload.nitrogen, 1)}:{round(payload.phosphorus, 1)}:{round(payload.potassium, 1)}"
+    cache_key = f"fert_rec:{round(payload.nitrogen, 1)}:{round(payload.phosphorus, 1)}:{round(payload.potassium, 1)}:{payload.crop_type}"
     
     cached_data = await get_json_cache(cache_key)
     if cached_data:
@@ -122,13 +122,13 @@ async def get_fertilizer_recommendation(
         # Fetch from ML service
         async with httpx.AsyncClient() as client:
             try:
-                # Target crop is unused in heuristic model but used in logs
                 response = await client.post(
                     f"{settings.ML_SERVICE_URL}/recommendations/fertilizer",
                     json={
                         "nitrogen": payload.nitrogen,
                         "phosphorus": payload.phosphorus,
-                        "potassium": payload.potassium
+                        "potassium": payload.potassium,
+                        "crop_type": payload.crop_type
                     },
                     timeout=10.0
                 )

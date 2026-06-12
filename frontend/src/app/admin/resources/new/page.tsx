@@ -42,7 +42,7 @@ export default function NewResourcePage() {
     watch,
     formState: { errors },
   } = useForm<ResourceFormValues>({
-    resolver: zodResolver(resourceFormSchema as any),
+    resolver: zodResolver(resourceFormSchema as unknown as Parameters<typeof zodResolver>[0]),
     defaultValues: {
       title: "",
       slug: "",
@@ -72,8 +72,8 @@ export default function NewResourcePage() {
   }, [titleValue, setValue]);
 
   const createMutation = useMutation({
-    mutationFn: async (values: any) => {
-      const response = await api.post("/educational", values);
+    mutationFn: async (payload: { title: string; slug: string; summary: string; content: string; category: string; tags: string[]; crop_tags: string[]; media_url: string | null; language: string; status: string; }) => {
+      const response = await api.post("/educational", payload);
       return response.data;
     },
     onSuccess: () => {
@@ -85,8 +85,8 @@ export default function NewResourcePage() {
       });
       router.push("/admin/resources");
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "Failed to create resource.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to create resource.";
       toast({
         title: "Submission Failed",
         description: errMsg,

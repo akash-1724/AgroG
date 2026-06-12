@@ -16,11 +16,12 @@ FROM python:3.12-slim AS runner
 WORKDIR /app
 
 COPY --from=builder /root/.local /root/.local
-COPY . .
+COPY . /app/ml_service
 
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 EXPOSE 8001
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "ml_service.main:app", "--host", "0.0.0.0", "--port", "8001"]

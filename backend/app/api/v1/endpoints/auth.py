@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.api.deps import get_current_user, RoleChecker
-from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token
+from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token, hash_refresh_token
 from app.models.user import User, FarmerProfile
 from app.models.auth import RefreshToken
 from app.schemas.user import UserCreate, UserResponse, TokenResponse, UserLogin, GoogleLogin, TokenRefreshRequest
@@ -99,7 +99,7 @@ async def login(
     # Save refresh token in database
     db_token = RefreshToken(
         user_id=user.id,
-        token=refresh_token,
+        token=hash_refresh_token(refresh_token),
         expires_at=datetime.utcnow() + timedelta(days=7)
     )
     db.add(db_token)
@@ -118,7 +118,8 @@ async def login(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "role": user.role
     }
 
 @router.post("/token-json", response_model=TokenResponse)
@@ -143,7 +144,7 @@ async def login_json(
     # Save refresh token in database
     db_token = RefreshToken(
         user_id=user.id,
-        token=refresh_token,
+        token=hash_refresh_token(refresh_token),
         expires_at=datetime.utcnow() + timedelta(days=7)
     )
     db.add(db_token)
@@ -161,7 +162,8 @@ async def login_json(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "role": user.role
     }
 
 @router.post("/google", response_model=TokenResponse)
@@ -173,8 +175,9 @@ async def google_login(
     """Google OAuth token login. Verifies ID token with Google APIs, auto-registers new users."""
     async with httpx.AsyncClient() as client:
         try:
-            google_res = await client.get(
-                f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.id_token}",
+            google_res = await client.post(
+                "https://oauth2.googleapis.com/tokeninfo",
+                data={"id_token": payload.id_token},
                 timeout=5.0
             )
         except Exception:
@@ -193,10 +196,20 @@ async def google_login(
     email = google_data.get("email")
     full_name = google_data.get("name", "Google User")
     
-    if not email:
+    # Check email_verified claim
+    email_verified = google_data.get("email_verified")
+    if not email or (email_verified not in [True, "true"]):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email address not verified or provided by Google"
+        )
+        
+    # Check the aud client ID claim if GOOGLE_CLIENT_ID is set
+    aud = google_data.get("aud")
+    if settings.GOOGLE_CLIENT_ID and aud != settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Audience claim mismatch (invalid client ID)"
         )
         
     # Check if user already exists
@@ -220,6 +233,15 @@ async def google_login(
     access_token = create_access_token(subject=user.id, role=user.role)
     refresh_token = create_refresh_token(subject=user.id)
     
+    # Save refresh token in database (hashed!)
+    db_token = RefreshToken(
+        user_id=user.id,
+        token=hash_refresh_token(refresh_token),
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(db_token)
+    await db.commit()
+    
     # HttpOnly Cookie for refresh token
     response.set_cookie(
         key="refresh_token",
@@ -233,15 +255,17 @@ async def google_login(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "role": user.role
     }
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     payload: TokenRefreshRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
-    """Renew user access tokens using a valid refresh token."""
+    """Renew user access tokens using a valid refresh token with rotation and reuse detection."""
     try:
         decoded = decode_token(payload.refresh_token, is_refresh=True)
         user_id = decoded.get("sub")
@@ -251,18 +275,30 @@ async def refresh_token(
             detail=str(e)
         )
 
+    hashed_token = hash_refresh_token(payload.refresh_token)
+
     # Check database status and revocation flags
     result = await db.execute(
-        select(RefreshToken).where(
-            RefreshToken.token == payload.refresh_token,
-            RefreshToken.is_revoked == False
-        )
+        select(RefreshToken).where(RefreshToken.token == hashed_token)
     )
     db_token = result.scalars().first()
     if not db_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token is invalid or has been revoked."
+            detail="Refresh token is invalid."
+        )
+
+    # REUSE DETECTION: If token is already revoked, revoke all tokens for this user!
+    if db_token.is_revoked:
+        user_tokens_res = await db.execute(
+            select(RefreshToken).where(RefreshToken.user_id == db_token.user_id)
+        )
+        for tok in user_tokens_res.scalars().all():
+            tok.is_revoked = True
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Compromised session. All sessions revoked."
         )
 
     if db_token.expires_at < datetime.utcnow():
@@ -279,12 +315,37 @@ async def refresh_token(
             detail="User not found."
         )
 
+    # Revoke current token
+    db_token.is_revoked = True
+
+    # Generate new pair
     new_access_token = create_access_token(subject=user.id, role=user.role)
-    
+    new_refresh_token = create_refresh_token(subject=user.id)
+
+    # Save new refresh token in database (hashed!)
+    new_db_token = RefreshToken(
+        user_id=user.id,
+        token=hash_refresh_token(new_refresh_token),
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(new_db_token)
+    await db.commit()
+
+    # HttpOnly Cookie for refresh token
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=7 * 24 * 60 * 60
+    )
+
     return {
         "access_token": new_access_token,
-        "refresh_token": payload.refresh_token,
-        "token_type": "bearer"
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+        "role": user.role
     }
 
 @router.post("/logout")
@@ -294,8 +355,9 @@ async def logout(
     db: AsyncSession = Depends(get_db)
 ):
     """Revoke user refresh tokens and clear auth cookies."""
+    hashed_token = hash_refresh_token(payload.refresh_token)
     result = await db.execute(
-        select(RefreshToken).where(RefreshToken.token == payload.refresh_token)
+        select(RefreshToken).where(RefreshToken.token == hashed_token)
     )
     db_token = result.scalars().first()
     if db_token:

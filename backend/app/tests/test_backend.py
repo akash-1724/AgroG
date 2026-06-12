@@ -105,6 +105,75 @@ async def test_auth_registration_and_login(client):
     )
     assert logout_response.status_code == 200
 
+# 2b. Refresh Token Rotation, Reuse, and Logout tests
+@pytest.mark.anyio
+async def test_refresh_token_rotation_and_revocation(client):
+    email = "rotation@example.com"
+    pwd = "rotationpassword"
+    reg_data = {
+        "email": email,
+        "password": pwd,
+        "full_name": "Rotation Test",
+        "role": "customer"
+    }
+    await client.post("/api/v1/auth/register", json=reg_data)
+    
+    login_response = await client.post(
+        "/api/v1/auth/token",
+        data={"username": email, "password": pwd}
+    )
+    assert login_response.status_code == 200
+    tokens = login_response.json()
+    first_refresh = tokens["refresh_token"]
+
+    # 1. First refresh should work and rotate
+    refresh_res = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": first_refresh}
+    )
+    assert refresh_res.status_code == 200
+    rotated_tokens = refresh_res.json()
+    second_refresh = rotated_tokens["refresh_token"]
+    assert first_refresh != second_refresh
+
+    # 2. Reuse of first refresh token should be blocked and trigger revocation
+    reuse_res = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": first_refresh}
+    )
+    assert reuse_res.status_code == 401
+    assert "Compromised session" in reuse_res.json()["detail"]
+
+    # 3. Verify that the second refresh token is now also invalid
+    stale_refresh_res = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": second_refresh}
+    )
+    assert stale_refresh_res.status_code == 401
+
+    # 4. Verify logout with new login
+    login_response_new = await client.post(
+        "/api/v1/auth/token",
+        data={"username": email, "password": pwd}
+    )
+    new_tokens = login_response_new.json()
+    active_refresh = new_tokens["refresh_token"]
+
+    # Logout
+    logout_res = await client.post(
+        "/api/v1/auth/logout",
+        json={"refresh_token": active_refresh},
+        headers={"Authorization": f"Bearer {new_tokens['access_token']}"}
+    )
+    assert logout_res.status_code == 200
+
+    # Token should now be invalid
+    post_logout_res = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": active_refresh}
+    )
+    assert post_logout_res.status_code == 401
+
 # 3. RBAC validation
 @pytest.mark.anyio
 async def test_rbac_guard(client):

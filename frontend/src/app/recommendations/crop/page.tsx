@@ -39,7 +39,7 @@ export default function CropRecommendationPage() {
     formState: { errors },
     reset,
   } = useForm<CropFormValues>({
-    resolver: zodResolver(cropFormSchema as any),
+    resolver: zodResolver(cropFormSchema as unknown as Parameters<typeof zodResolver>[0]),
     defaultValues: {
       nitrogen: 50,
       phosphorus: 50,
@@ -67,8 +67,8 @@ export default function CropRecommendationPage() {
         variant: "default",
       });
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "ML model recommendation failed.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "ML model recommendation failed.";
       toast({
         title: "Recommendation Failed",
         description: errMsg,
@@ -212,7 +212,7 @@ export default function CropRecommendationPage() {
                   </h3>
                   <div className="space-y-3">
                     {recommendations.length > 0 ? (
-                      recommendations.map((crop: any, index) => {
+                      recommendations.map((crop: string | { crop: string; probability?: number }, index) => {
                         const cropName = typeof crop === "string" ? crop : crop.crop;
                         const probability = typeof crop === "object" && crop?.probability !== undefined ? crop.probability : null;
                         

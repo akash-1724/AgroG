@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
@@ -45,9 +45,10 @@ export default function RegisterPage() {
     register: formRegister,
     handleSubmit,
     watch,
+    control,
     formState: { errors },
   } = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema as any),
+    resolver: zodResolver(registerSchema as unknown as Parameters<typeof zodResolver>[0]),
     defaultValues: {
       role: "customer"
     }
@@ -59,7 +60,7 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     
     // Prepare payload matching the UserCreate schema
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       email: data.email,
       password: data.password,
       full_name: data.full_name,
@@ -81,8 +82,8 @@ export default function RegisterPage() {
       await api.post("/auth/register", payload);
       toast("Account registered successfully! Please log in.", "success");
       router.push("/login");
-    } catch (error: any) {
-      const msg = error.response?.data?.detail || "Registration failed. Try again.";
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Registration failed. Try again.";
       toast(msg, "error");
     } finally {
       setIsSubmitting(false);
@@ -108,10 +109,22 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Role</label>
-                <Select {...formRegister("role")}>
-                  <option value="customer">Buyer / Customer</option>
-                  <option value="farmer">Farmer / Seller</option>
-                </Select>
+                <Controller
+                  control={control}
+                  name="role"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="customer">Buyer / Customer</SelectItem>
+                        <SelectItem value="farmer">Farmer / Seller</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
               </div>
             </div>
 

@@ -48,8 +48,8 @@ export default function DiseaseDiagnosisPage() {
         variant: "default",
       });
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "Plant disease scan failed.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Plant disease scan failed.";
       toast({
         title: "Scan Failed",
         description: errMsg,
@@ -313,7 +313,7 @@ export default function DiseaseDiagnosisPage() {
                 <div className="space-y-3">
                   <FileImage className="h-12 w-12 text-muted/40 mx-auto" />
                   <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                    Select or drag-and-drop a leaf image and click "Run AI Diagnostic" to view findings.
+                    Select or drag-and-drop a leaf image and click &quot;Run AI Diagnostic&quot; to view findings.
                   </p>
                 </div>
               )}

@@ -50,7 +50,7 @@ function EditListingContent() {
     setValue,
     formState: { errors },
   } = useForm<ListingFormValues>({
-    resolver: zodResolver(listingSchema as any),
+    resolver: zodResolver(listingSchema as unknown as Parameters<typeof zodResolver>[0]),
   });
 
   // Query to fetch current listing values
@@ -79,8 +79,8 @@ function EditListingContent() {
       await api.put(`/marketplace/listings/${listingId}`, data);
       toast("Crop listing updated successfully!", "success");
       router.push("/farmer/listings");
-    } catch (error: any) {
-      const msg = error.response?.data?.detail || "Failed to update crop listing.";
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to update crop listing.";
       toast(msg, "error");
     } finally {
       setIsSubmitting(false);

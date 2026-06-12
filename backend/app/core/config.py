@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Redis Settings
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
+    # CORS Settings
+    BACKEND_CORS_ORIGINS: list[str] = Field(default=["http://localhost:3000"])
+
     # Security Settings
     JWT_SECRET: str = Field(default="super-secret-change-me-in-production-12345")
     JWT_REFRESH_SECRET: str = Field(default="another-super-secret-refresh-key-98765")

@@ -58,8 +58,8 @@ function FarmerOrdersContent() {
       toast(`Order status updated to ${data.status} successfully.`, "success");
       queryClient.invalidateQueries({ queryKey: ["farmerOrders"] });
     },
-    onError: (err: any) => {
-      const msg = err.response?.data?.detail || "Failed to update order status.";
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to update order status.";
       toast(msg, "error");
     }
   });

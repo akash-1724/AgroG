@@ -43,7 +43,7 @@ export default function EditResourcePage() {
     reset,
     formState: { errors },
   } = useForm<ResourceFormValues>({
-    resolver: zodResolver(resourceFormSchema as any),
+    resolver: zodResolver(resourceFormSchema as unknown as Parameters<typeof zodResolver>[0]),
     defaultValues: {
       title: "",
       slug: "",
@@ -87,8 +87,8 @@ export default function EditResourcePage() {
   }, [resource, reset]);
 
   const updateMutation = useMutation({
-    mutationFn: async (values: any) => {
-      const response = await api.patch(`/educational/${id}`, values);
+    mutationFn: async (payload: { title: string; slug: string; summary: string; content: string; category: string; tags: string[]; crop_tags: string[]; media_url: string | null; language: string; status: string; }) => {
+      const response = await api.patch(`/educational/${id}`, payload);
       return response.data;
     },
     onSuccess: () => {
@@ -102,8 +102,8 @@ export default function EditResourcePage() {
       });
       router.push("/admin/resources");
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "Failed to update resource.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to update resource.";
       toast({
         title: "Update Failed",
         description: errMsg,

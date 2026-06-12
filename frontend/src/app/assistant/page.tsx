@@ -75,8 +75,8 @@ export default function AssistantPage() {
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
       queryClient.invalidateQueries({ queryKey: ["conversation", data.conversation_id] });
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "AI Chat submission failed.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "AI Chat submission failed.";
       toast({
         title: "Chat Error",
         description: errMsg,

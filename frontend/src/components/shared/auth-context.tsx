@@ -34,19 +34,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     try {
-      // Decode JWT token directly on client for immediate role matching
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        setUser({
-          id: payload.sub,
-          email: "", // Will fetch or parse from profile route if needed
-          full_name: payload.full_name || "Active User",
-          role: payload.role || "customer",
-        });
-      }
+      const response = await api.get("/auth/me");
+      setUser(response.data);
     } catch (e) {
       localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -66,7 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   React.useEffect(() => {
-    fetchProfile();
+    const timer = setTimeout(() => {
+      fetchProfile();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchProfile]);
 
   return (

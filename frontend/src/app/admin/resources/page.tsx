@@ -49,8 +49,8 @@ export default function AdminResourcesPage() {
         variant: "default",
       });
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "Failed to delete article.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to delete article.";
       toast({
         title: "Deletion Failed",
         description: errMsg,

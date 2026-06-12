@@ -28,6 +28,7 @@ class FertilizerRecommendationInput(BaseModel):
     nitrogen: float = Field(..., ge=0.0, le=200.0, description="Soil Nitrogen ratio (N)")
     phosphorus: float = Field(..., ge=0.0, le=200.0, description="Soil Phosphorus ratio (P)")
     potassium: float = Field(..., ge=0.0, le=200.0, description="Soil Potassium ratio (K)")
+    crop_type: str = Field(default="rice", description="Target Crop Type")
 
 @app.get("/")
 def read_root():

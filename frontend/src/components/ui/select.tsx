@@ -21,14 +21,14 @@ export function Select({
   value?: string;
   onValueChange?: (val: string) => void;
 }) {
+  const [prevValue, setPrevValue] = React.useState(value);
   const [selectedValue, setSelectedValue] = React.useState(value || defaultValue || "");
   const [open, setOpen] = React.useState(false);
 
-  React.useEffect(() => {
-    if (value !== undefined) {
-      setSelectedValue(value);
-    }
-  }, [value]);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setSelectedValue(value || "");
+  }
 
   const handleValueChange = (val: string) => {
     setSelectedValue(val);

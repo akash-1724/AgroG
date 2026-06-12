@@ -45,7 +45,7 @@ function NewListingContent() {
     handleSubmit,
     formState: { errors },
   } = useForm<ListingFormValues>({
-    resolver: zodResolver(listingSchema as any),
+    resolver: zodResolver(listingSchema as unknown as Parameters<typeof zodResolver>[0]),
     defaultValues: {
       category: "Vegetables",
       unit: "kg",
@@ -58,8 +58,8 @@ function NewListingContent() {
       await api.post("/marketplace/listings", data);
       toast("Crop listing created successfully!", "success");
       router.push("/farmer/listings");
-    } catch (error: any) {
-      const msg = error.response?.data?.detail || "Failed to create crop listing.";
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to create crop listing.";
       toast(msg, "error");
     } finally {
       setIsSubmitting(false);

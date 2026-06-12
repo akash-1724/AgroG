@@ -10,7 +10,7 @@ from app.models.user import User
 from app.models.marketplace import CropListing, Order, OrderItem
 from app.schemas.marketplace import (
     CropListingCreate, CropListingUpdate, CropListingResponse,
-    OrderCreate, OrderResponse, OrderStatusUpdate
+    OrderCreate, OrderResponse, OrderStatusUpdate, FarmerOrderResponse
 )
 
 router = APIRouter()
@@ -252,9 +252,32 @@ async def list_orders(
         # Select orders that contain at least one item belonging to this farmer's crop listings
         query = select(Order).join(OrderItem).join(CropListing).where(
             CropListing.farmer_id == current_user.id
-        ).options(selectinload(Order.items)).distinct()
+        ).options(
+            selectinload(Order.items).selectinload(OrderItem.crop_listing)
+        ).distinct()
         result = await db.execute(query)
-        return result.scalars().all()
+        orders = result.scalars().all()
+        
+        farmer_orders = []
+        for order in orders:
+            filtered_items = []
+            total_farmer_amount = 0.0
+            for item in order.items:
+                if item.crop_listing and item.crop_listing.farmer_id == current_user.id:
+                    filtered_items.append(item)
+                    total_farmer_amount += item.quantity * item.price_at_purchase
+            
+            # Construct a response object compatible with OrderResponse schema, but containing only farmer's info
+            farmer_orders.append({
+                "id": order.id,
+                "customer_id": order.customer_id,
+                "status": order.status,
+                "total_amount": total_farmer_amount,
+                "items": filtered_items,
+                "created_at": order.created_at,
+                "updated_at": order.updated_at
+            })
+        return farmer_orders
         
     else:
         # Customer sees their own orders
@@ -287,21 +310,36 @@ async def read_order(
         )
         
     # Check permissions (Customer who placed it, Farmer selling, or Admin)
-    if current_user.role != "admin" and order.customer_id != current_user.id:
-        # Check if the farmer sells any item in this order
-        farmer_item = False
+    if current_user.role == "farmer":
+        filtered_items = []
+        total_farmer_amount = 0.0
         for item in order.items:
-            # Need to select crop listing explicitly or use selectinload
             res_cl = await db.execute(select(CropListing).where(CropListing.id == item.crop_listing_id))
             cl = res_cl.scalars().first()
             if cl and cl.farmer_id == current_user.id:
-                farmer_item = True
-                break
-        if not farmer_item:
+                item.crop_listing = cl
+                filtered_items.append(item)
+                total_farmer_amount += item.quantity * item.price_at_purchase
+        if not filtered_items:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to view this order."
             )
+        return {
+            "id": order.id,
+            "customer_id": order.customer_id,
+            "status": order.status,
+            "total_amount": total_farmer_amount,
+            "items": filtered_items,
+            "created_at": order.created_at,
+            "updated_at": order.updated_at
+        }
+        
+    if current_user.role != "admin" and order.customer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to view this order."
+        )
             
     return order
 
@@ -410,5 +448,27 @@ async def update_order_status(
         .where(Order.id == order.id)
         .options(selectinload(Order.items))
     )
-    return res_reload.scalars().first()
+    reloaded_order = res_reload.scalars().first()
+    
+    if current_user.role == "farmer":
+        filtered_items = []
+        total_farmer_amount = 0.0
+        for item in reloaded_order.items:
+            res_cl = await db.execute(select(CropListing).where(CropListing.id == item.crop_listing_id))
+            cl = res_cl.scalars().first()
+            if cl and cl.farmer_id == current_user.id:
+                item.crop_listing = cl
+                filtered_items.append(item)
+                total_farmer_amount += item.quantity * item.price_at_purchase
+        return {
+            "id": reloaded_order.id,
+            "customer_id": reloaded_order.customer_id,
+            "status": reloaded_order.status,
+            "total_amount": total_farmer_amount,
+            "items": filtered_items,
+            "created_at": reloaded_order.created_at,
+            "updated_at": reloaded_order.updated_at
+        }
+        
+    return reloaded_order
 

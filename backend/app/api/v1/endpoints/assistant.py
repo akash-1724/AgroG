@@ -53,6 +53,8 @@ async def chat_assistant(
         if payload.conversation_id:
             convo_res = await db.execute(select(AssistantConversation).where(AssistantConversation.id == payload.conversation_id))
             convo = convo_res.scalars().first()
+            if convo and convo.user_id != current_user.id:
+                raise HTTPException(status_code=403, detail="Not authorized to access this conversation.")
             if not convo:
                 convo = AssistantConversation(id=conversation_id, user_id=current_user.id)
                 db.add(convo)
@@ -91,6 +93,8 @@ async def chat_assistant(
         convo = convo_res.scalars().first()
         if not convo:
             raise HTTPException(status_code=404, detail="Conversation not found.")
+        if convo.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to access this conversation.")
     else:
         convo = AssistantConversation(user_id=current_user.id)
         db.add(convo)

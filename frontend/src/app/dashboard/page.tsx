@@ -17,6 +17,38 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 
+interface DashboardOrder {
+  id: string;
+  customer_id: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+  items?: {
+    crop_listing_id: string;
+    quantity: number;
+    price_at_purchase: number;
+  }[];
+}
+
+interface DashboardListing {
+  id: string;
+  farmer_id: string;
+  title: string;
+  description: string;
+  price_per_unit: number;
+  unit: string;
+  available_quantity: number;
+  status: string;
+}
+
+interface DashboardArticle {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+}
+
 export default function UnifiedDashboard() {
   const router = useRouter();
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -47,7 +79,7 @@ export default function UnifiedDashboard() {
   }, [user, authLoading, router]);
 
   // Fetch orders (For Customer/Farmer/Admin)
-  const { data: orders = [], isLoading: ordersLoading } = useQuery<any[]>({
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<DashboardOrder[]>({
     queryKey: ["dashboardOrders"],
     queryFn: async () => {
       const response = await api.get("/marketplace/orders");
@@ -57,7 +89,7 @@ export default function UnifiedDashboard() {
   });
 
   // Fetch all crop listings (Farmers can view/manage their listings, admins see all)
-  const { data: listings = [], isLoading: listingsLoading } = useQuery<any[]>({
+  const { data: listings = [], isLoading: listingsLoading } = useQuery<DashboardListing[]>({
     queryKey: ["dashboardListings"],
     queryFn: async () => {
       const response = await api.get("/marketplace");
@@ -67,7 +99,7 @@ export default function UnifiedDashboard() {
   });
 
   // Fetch educational articles (For Admin CMS)
-  const { data: articles = [], isLoading: articlesLoading } = useQuery<any[]>({
+  const { data: articles = [], isLoading: articlesLoading } = useQuery<DashboardArticle[]>({
     queryKey: ["dashboardArticles"],
     queryFn: async () => {
       const response = await api.get("/educational");
@@ -78,7 +110,7 @@ export default function UnifiedDashboard() {
 
   // Create listing mutation
   const createListingMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: Omit<DashboardListing, "id" | "farmer_id">) => {
       return await api.post("/marketplace/listings", payload);
     },
     onSuccess: () => {
@@ -91,8 +123,8 @@ export default function UnifiedDashboard() {
       setListingPrice(0);
       setListingQty(100);
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "Failed to create listing.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to create listing.";
       toast({ title: "Error", description: errMsg, variant: "destructive" });
     },
   });
@@ -113,7 +145,7 @@ export default function UnifiedDashboard() {
 
   // Create article mutation
   const createArticleMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: Omit<DashboardArticle, "id">) => {
       return await api.post("/educational", payload);
     },
     onSuccess: () => {
@@ -148,7 +180,7 @@ export default function UnifiedDashboard() {
       queryClient.invalidateQueries({ queryKey: ["dashboardOrders"] });
       toast({ title: "Order Updated", description: "Order status was updated successfully." });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error", description: "Failed to update order status.", variant: "destructive" });
     },
   });
@@ -344,7 +376,7 @@ export default function UnifiedDashboard() {
               <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
             ) : farmerListings.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-xl border border-zinc-200">
-                <p className="text-muted-foreground font-semibold">You haven't posted any crop listings yet.</p>
+                <p className="text-muted-foreground font-semibold">You haven&apos;t posted any crop listings yet.</p>
                 <Button onClick={() => setShowAddListingModal(true)} className="mt-4 font-bold flex items-center gap-2 mx-auto">
                   <Plus className="h-4 w-4" /> Create First Listing
                 </Button>
@@ -426,7 +458,7 @@ export default function UnifiedDashboard() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 bg-white">
-                              {order.items?.map((item: any) => (
+                              {order.items?.map((item: { crop_listing_id: string; quantity: number; price_at_purchase: number }) => (
                                 <tr key={item.crop_listing_id}>
                                   <td className="px-4 py-2 font-mono">{item.crop_listing_id.slice(0, 8)}</td>
                                   <td className="px-4 py-2">{item.quantity}</td>
@@ -596,6 +628,7 @@ export default function UnifiedDashboard() {
                     price_per_unit: listingPrice,
                     unit: listingUnit,
                     available_quantity: listingQty,
+                    status: "active",
                   });
                 }}
                 disabled={createListingMutation.isPending || !listingTitle}

@@ -6,7 +6,13 @@ from app.core.config import settings
 
 import bcrypt
 
+import hashlib
+
 ALGORITHM = "HS256"
+
+def hash_refresh_token(token: str) -> str:
+    """Generate a SHA-256 hash of a refresh token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain text password against its hash."""
@@ -42,6 +48,7 @@ def create_access_token(subject: Any, role: str, expires_delta: Optional[timedel
 
 def create_refresh_token(subject: Any, expires_delta: Optional[timedelta] = None) -> str:
     """Create a long-lived JWT refresh token."""
+    import uuid
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -50,7 +57,8 @@ def create_refresh_token(subject: Any, expires_delta: Optional[timedelta] = None
     to_encode = {
         "exp": expire,
         "sub": str(subject),
-        "type": "refresh"
+        "type": "refresh",
+        "jti": uuid.uuid4().hex
     }
     encoded_jwt = jwt.encode(to_encode, settings.JWT_REFRESH_SECRET, algorithm=ALGORITHM)
     return encoded_jwt

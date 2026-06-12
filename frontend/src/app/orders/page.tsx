@@ -59,8 +59,8 @@ function CustomerOrdersContent() {
       toast("Order has been cancelled successfully.", "success");
       queryClient.invalidateQueries({ queryKey: ["customerOrders"] });
     },
-    onError: (err: any) => {
-      const msg = err.response?.data?.detail || "Failed to cancel order.";
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to cancel order.";
       toast(msg, "error");
     }
   });

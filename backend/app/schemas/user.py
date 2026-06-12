@@ -42,6 +42,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    role: Optional[str] = None
 
 # Schema for Google OAuth Token Login
 class GoogleLogin(BaseModel):

@@ -33,12 +33,7 @@ export default function NearbyFarmersPage() {
   const [radius, setRadius] = React.useState(10);
   const [coordsLoading, setCoordsLoading] = React.useState(false);
 
-  // Autofill GPS coordinates on mount
-  React.useEffect(() => {
-    handleFetchCurrentLocation(false);
-  }, []);
-
-  const handleFetchCurrentLocation = (showToast = true) => {
+  const handleFetchCurrentLocation = React.useCallback((showToast = true) => {
     if (!navigator.geolocation) {
       if (showToast) {
         toast({
@@ -80,7 +75,15 @@ export default function NearbyFarmersPage() {
         setLon(77.5946);
       }
     );
-  };
+  }, [toast]);
+
+  // Autofill GPS coordinates on mount
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      handleFetchCurrentLocation(false);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [handleFetchCurrentLocation]);
 
   // Query nearby farmers once coords are populated
   const { data: farmers = [], isLoading, refetch } = useQuery<NearbyFarmer[]>({
@@ -154,7 +157,7 @@ export default function NearbyFarmersPage() {
           <AlertCircle className="h-12 w-12 text-muted/40 mx-auto mb-3" />
           <h3 className="font-bold text-lg text-foreground">No Farmers Nearby</h3>
           <p className="text-muted-foreground text-sm max-w-sm mx-auto mt-1">
-            We couldn't find any visible farmers within a {radius}km radius of your coordinates. Try expanding your search radius.
+            We couldn&apos;t find any visible farmers within a {radius}km radius of your coordinates. Try expanding your search radius.
           </p>
         </Card>
       ) : (

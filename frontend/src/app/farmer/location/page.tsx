@@ -36,7 +36,7 @@ export default function FarmerLocationPage() {
     watch,
     formState: { errors },
   } = useForm<LocationFormValues>({
-    resolver: zodResolver(locationFormSchema as any),
+    resolver: zodResolver(locationFormSchema as unknown as Parameters<typeof zodResolver>[0]),
     defaultValues: {
       latitude: 0.0,
       longitude: 0.0,
@@ -86,8 +86,8 @@ export default function FarmerLocationPage() {
         description: "Successfully updated your farm coordinate visibility and details.",
       });
     },
-    onError: (err: any) => {
-      const errMsg = err.response?.data?.detail || "Failed to update location.";
+    onError: (err: unknown) => {
+      const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to update location.";
       toast({
         title: "Update Failed",
         description: errMsg,
@@ -146,7 +146,7 @@ export default function FarmerLocationPage() {
             <MapPin className="h-6 w-6 text-primary" /> Farm Location Settings
           </CardTitle>
           <CardDescription>
-            Update your farm's coordinate visibility and addresses to help local customers discover your listings.
+            Update your farm&apos;s coordinate visibility and addresses to help local customers discover your listings.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
