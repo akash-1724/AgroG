@@ -361,9 +361,6 @@ export default function UnifiedDashboard() {
                 <Link href="/recommendations/fertilizer">
                   <Button variant="outline" className="font-bold">Fertilizer prescription</Button>
                 </Link>
-                <Link href="/diagnostics/disease">
-                  <Button variant="outline" className="font-bold">Leaf Disease Scanner</Button>
-                </Link>
               </CardContent>
             </Card>
           </div>

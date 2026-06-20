@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Leaf, ShoppingBag, ShieldCheck, Users, TrendingUp, HelpCircle } from "lucide-react";
+import { ArrowRight, Leaf, ShoppingBag, ShieldCheck, Users, TrendingUp, Sprout, FlaskConical, ScanSearch } from "lucide-react";
 
 export default function Home() {
   return (
@@ -30,6 +30,12 @@ export default function Home() {
                 className="inline-flex items-center gap-2 bg-slate-900/60 hover:bg-slate-900/80 border border-slate-700 text-white font-medium px-6 py-3 rounded-lg transition duration-300"
               >
                 Join as a Farmer <ArrowRight className="h-5 w-5" />
+              </Link>
+              <Link
+                href="/recommendations/crop"
+                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white font-medium px-6 py-3 rounded-lg transition duration-300"
+              >
+                Try AI Crop Advisor <Sprout className="h-5 w-5" />
               </Link>
             </div>
           </div>
@@ -66,6 +72,39 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* AI Advisory Tools */}
+      <section className="py-20 px-6 max-w-6xl mx-auto w-full">
+        <div className="mb-10 text-center space-y-3">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">ML-Powered Advisory</p>
+          <h2 className="text-3xl font-bold text-slate-900">Use AgroGuide Beyond Buy and Sell</h2>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            These tools call the backend recommendation APIs, which forward crop, fertilizer, and image inputs to the isolated ML service.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <Link href="/recommendations/crop" className="group bg-white rounded-2xl border border-emerald-100 p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition">
+            <div className="inline-flex p-3 rounded-xl bg-emerald-100 text-emerald-700 mb-5 group-hover:bg-emerald-500 group-hover:text-white transition">
+              <Sprout className="h-6 w-6" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-950 mb-2">Crop Recommendation</h3>
+            <p className="text-slate-600 mb-4">Input nitrogen, phosphorus, potassium, pH, and local weather to find matching crops.</p>
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
+              Open crop AI <ArrowRight className="h-4 w-4" />
+            </span>
+          </Link>
+          <Link href="/recommendations/fertilizer" className="group bg-white rounded-2xl border border-amber-100 p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition">
+            <div className="inline-flex p-3 rounded-xl bg-amber-100 text-amber-700 mb-5 group-hover:bg-amber-500 group-hover:text-white transition">
+              <FlaskConical className="h-6 w-6" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-950 mb-2">Fertilizer Recommendation</h3>
+            <p className="text-slate-600 mb-4">Use soil nutrient values and target crop type to get fertilizer guidance.</p>
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-amber-700">
+              Open fertilizer AI <ArrowRight className="h-4 w-4" />
+            </span>
+          </Link>
         </div>
       </section>
 
