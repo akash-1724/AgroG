@@ -7,6 +7,7 @@ Initial definition of the Educational Resources capability for AgroGuide.
 The system SHALL display categorized educational guides, articles, and tutorials related to sustainable farming, crop management, and pest control.
 Farmers and customers SHALL be able to browse published resources, but draft resources MUST only be visible to Admins.
 The system SHALL support searching and filtering resources by title, category, tags, crop tags, and language.
+The final audit SHALL verify publish/draft visibility and browsing behavior without adding new content features.
 
 #### Scenario: User Browses Educational Guides
 - **WHEN** any farmer or customer requests the educational library
@@ -16,9 +17,14 @@ The system SHALL support searching and filtering resources by title, category, t
 - **WHEN** an Admin requests the educational library
 - **THEN** the system SHALL return all educational articles including both published and draft resources
 
+#### Scenario: Final audit checks resource visibility
+- **WHEN** the final audit reviews educational resources
+- **THEN** it SHALL verify or document whether public users are blocked from draft resources and Admin users can manage all resources
+
 ### Requirement: Educational Content Management
 The system SHALL allow Admins to create, edit, publish, unpublish, and delete educational resources.
 Educational resource fields SHALL include ID, title, slug, summary, content, category, tags, crop_tags, media_url, language, draft/published status, author_id, created_at, and updated_at.
+The final audit SHALL verify CRUD authorization and schema consistency without creating new resource product features.
 
 #### Scenario: Admin Publishes a Tutorial
 - **WHEN** an authenticated Admin submits a new tutorial with title, category, status "published", and content
@@ -28,3 +34,6 @@ Educational resource fields SHALL include ID, title, slug, summary, content, cat
 - **WHEN** an authenticated Admin submits a new resource with status "draft"
 - **THEN** the system SHALL create the resource but hide it from the public catalog
 
+#### Scenario: Final audit checks content management
+- **WHEN** the final audit reviews educational content management
+- **THEN** it SHALL verify or document Admin-only create/edit/publish/unpublish/delete behavior and schema consistency

@@ -3,16 +3,44 @@ import math
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
+from sqlalchemy import func, text, select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.api.deps import get_current_user, RoleChecker
+from app.api.deps import RoleChecker
+from app.models.marketplace import CropListing
+from app.models.review import Review
 from app.models.user import User, FarmerProfile
-from app.schemas.farmers import FarmerLocationUpdate, NearbyFarmerResponse
+from app.schemas.farmers import FarmerLocationUpdate, FarmerProfileUpdate, NearbyFarmerResponse, PublicFarmerProfileResponse, PublicListingSummary
 
 router = APIRouter()
 
 farmer_guard = RoleChecker(allowed_roles=["farmer"])
+
+
+async def get_farmer_rating_summary(db: AsyncSession, farmer_id: uuid.UUID) -> dict:
+    result = await db.execute(
+        select(func.avg(Review.rating), func.count(Review.id)).where(Review.farmer_id == farmer_id)
+    )
+    average, count = result.one()
+    return {
+        "average_rating": round(float(average), 2) if average is not None else None,
+        "review_count": int(count or 0),
+    }
+
+
+def public_listing_summary(listing: CropListing) -> dict:
+    return {
+        "id": listing.id,
+        "title": listing.title,
+        "description": listing.description,
+        "price_per_unit": float(listing.price_per_unit),
+        "unit": listing.unit,
+        "available_quantity": listing.available_quantity,
+        "image_urls": listing.image_urls,
+        "category": listing.category,
+        "status": listing.status,
+    }
 
 @router.patch("/me/location", response_model=NearbyFarmerResponse)
 async def update_my_location(
@@ -58,6 +86,93 @@ async def update_my_location(
         distance_km=0.0,
         rating=profile.rating
     )
+
+
+@router.patch("/me/profile", response_model=PublicFarmerProfileResponse)
+async def update_my_profile(
+    payload: FarmerProfileUpdate,
+    current_user: User = Depends(farmer_guard),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(FarmerProfile).where(FarmerProfile.user_id == current_user.id))
+    profile = result.scalars().first()
+    if not profile:
+        profile = FarmerProfile(user_id=current_user.id)
+        db.add(profile)
+
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(profile, key, value)
+
+    await db.commit()
+    return await build_public_profile(db, current_user.id)
+
+
+async def build_public_profile(db: AsyncSession, farmer_id: uuid.UUID) -> dict:
+    result = await db.execute(
+        select(FarmerProfile)
+        .where(FarmerProfile.user_id == farmer_id)
+        .options(selectinload(FarmerProfile.user))
+    )
+    profile = result.scalars().first()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Farmer profile not found.")
+
+    listings_result = await db.execute(
+        select(CropListing)
+        .where(CropListing.farmer_id == farmer_id, CropListing.status == "active")
+        .order_by(CropListing.created_at.desc())
+    )
+    reviews_result = await db.execute(
+        select(Review)
+        .where(Review.farmer_id == farmer_id)
+        .options(selectinload(Review.customer))
+        .order_by(Review.created_at.desc())
+        .limit(10)
+    )
+    rating = await get_farmer_rating_summary(db, farmer_id)
+
+    return {
+        "farmer_id": profile.user_id,
+        "full_name": profile.user.full_name if profile.user else "Unknown farmer",
+        "farm_name": profile.farm_name,
+        "address": profile.address if profile.location_visibility else None,
+        "district": profile.district if profile.location_visibility else None,
+        "city": profile.city if profile.location_visibility else None,
+        "state": profile.state if profile.location_visibility else None,
+        "description": profile.description,
+        "average_rating": rating["average_rating"],
+        "review_count": rating["review_count"],
+        "active_listings": [public_listing_summary(listing) for listing in listings_result.scalars().all()],
+        "recent_reviews": [
+            {
+                "id": review.id,
+                "rating": review.rating,
+                "comment": review.comment,
+                "reviewer_name": review.customer.full_name if review.customer else None,
+                "created_at": review.created_at,
+            }
+            for review in reviews_result.scalars().all()
+        ],
+    }
+
+
+@router.get("/{farmer_id}/public", response_model=PublicFarmerProfileResponse)
+async def get_public_farmer_profile(farmer_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    return await build_public_profile(db, farmer_id)
+
+
+@router.get("/{farmer_id}/listings", response_model=List[PublicListingSummary])
+async def get_public_farmer_listings(farmer_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(FarmerProfile).where(FarmerProfile.user_id == farmer_id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Farmer profile not found.")
+
+    listings = await db.execute(
+        select(CropListing)
+        .where(CropListing.farmer_id == farmer_id, CropListing.status == "active")
+        .order_by(CropListing.created_at.desc())
+    )
+    return [public_listing_summary(listing) for listing in listings.scalars().all()]
 
 @router.get("/nearby", response_model=List[NearbyFarmerResponse])
 async def get_nearby_farmers(

@@ -3,11 +3,12 @@
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ShoppingBag, ChevronRight, XOctagon, Calendar, ClipboardList, Info } from "lucide-react";
+import { ChevronRight, XOctagon, Calendar, ClipboardList } from "lucide-react";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 
@@ -17,6 +18,7 @@ interface OrderItem {
   crop_listing_id: string;
   quantity: number;
   price_at_purchase: number;
+  status: "pending" | "accepted" | "ready" | "completed" | "rejected" | "cancelled";
 }
 
 interface Order {
@@ -39,6 +41,9 @@ export default function CustomerOrdersPage() {
 function CustomerOrdersContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [reviewingItemId, setReviewingItemId] = React.useState<string | null>(null);
+  const [reviewRating, setReviewRating] = React.useState(5);
+  const [reviewComment, setReviewComment] = React.useState("");
 
   // Fetch customer orders
   const { data: orders = [], isLoading, error } = useQuery<Order[]>({
@@ -64,6 +69,37 @@ function CustomerOrdersContent() {
       toast(msg, "error");
     }
   });
+
+  const createReviewMutation = useMutation({
+    mutationFn: async (payload: { rating: number; comment: string; listing_id: string; order_item_id: string }) => {
+      const response = await api.post("/reviews", payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast("Review submitted successfully.", "success");
+      setReviewingItemId(null);
+      setReviewRating(5);
+      setReviewComment("");
+      queryClient.invalidateQueries({ queryKey: ["customerOrders"] });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to submit review.";
+      toast(msg, "error");
+    },
+  });
+
+  const handleSubmitReview = (item: OrderItem) => {
+    if (reviewComment.trim().length < 3) {
+      toast("Review comment must be at least 3 characters.", "error");
+      return;
+    }
+    createReviewMutation.mutate({
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+      listing_id: item.crop_listing_id,
+      order_item_id: item.id,
+    });
+  };
 
   const handleCancelOrder = (id: string) => {
     if (confirm("Are you sure you want to cancel this order? This will restore crop listing stock immediately.")) {
@@ -126,12 +162,46 @@ function CustomerOrdersContent() {
                   {/* Items list */}
                   <div className="space-y-1 pl-1 border-l-2 border-emerald-500">
                     {order.items.map((item) => (
-                      <div key={item.id} className="text-xs text-slate-600">
-                        Listing Ref: {item.crop_listing_id.slice(0, 8)} —{" "}
-                        <span className="font-semibold text-slate-800">
-                          Qty: {item.quantity}
-                        </span>{" "}
-                        @ ${item.price_at_purchase}
+                      <div key={item.id} className="text-xs text-slate-600 space-y-2 py-1">
+                        <div>
+                          Listing Ref: <Link className="underline" href={`/marketplace/${item.crop_listing_id}`}>{item.crop_listing_id.slice(0, 8)}</Link> —{" "}
+                          <span className="font-semibold text-slate-800">
+                            Qty: {item.quantity}
+                          </span>{" "}
+                          @ ${item.price_at_purchase}
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">{item.status}</span>
+                        </div>
+                        {item.status === "completed" && (
+                          <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            {reviewingItemId === item.id ? (
+                              <>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                  <select
+                                    value={reviewRating}
+                                    onChange={(event) => setReviewRating(Number(event.target.value))}
+                                    className="rounded-md border border-slate-200 bg-white px-2 py-2 text-sm"
+                                  >
+                                    {[5, 4, 3, 2, 1].map((rating) => (
+                                      <option key={rating} value={rating}>{rating} stars</option>
+                                    ))}
+                                  </select>
+                                  <Input
+                                    value={reviewComment}
+                                    onChange={(event) => setReviewComment(event.target.value)}
+                                    placeholder="Write a short review"
+                                    className="text-sm"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => handleSubmitReview(item)} disabled={createReviewMutation.isPending}>Submit Review</Button>
+                                  <Button size="sm" variant="outline" onClick={() => setReviewingItemId(null)}>Cancel</Button>
+                                </div>
+                              </>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => setReviewingItemId(item.id)}>Review this purchase</Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

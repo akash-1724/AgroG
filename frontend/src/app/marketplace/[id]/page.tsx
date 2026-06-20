@@ -4,7 +4,7 @@ import * as React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ShoppingCart, Loader2 } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Loader2, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -22,6 +22,18 @@ interface CropListing {
   unit: string;
   available_quantity: number;
   image_urls?: string;
+  primary_image_url?: string | null;
+  images?: { id: string; image_url: string; is_primary: boolean }[];
+  average_rating?: number | null;
+  review_count: number;
+}
+
+interface Review {
+  id: string;
+  rating: number;
+  comment: string;
+  reviewer_name?: string;
+  created_at: string;
 }
 
 export default function ListingDetailPage() {
@@ -42,35 +54,40 @@ export default function ListingDetailPage() {
     enabled: !!listingId,
   });
 
-  // Checkout mutation
-  const checkoutMutation = useMutation({
-    mutationFn: async (payload: { items: { crop_listing_id: string; quantity: number }[] }) => {
-      const response = await api.post("/marketplace/orders", payload);
+  const { data: reviews = [] } = useQuery<Review[]>({
+    queryKey: ["listingReviews", listingId],
+    queryFn: async () => (await api.get(`/reviews/listings/${listingId}`)).data,
+    enabled: !!listingId,
+  });
+
+  const addToCartMutation = useMutation({
+    mutationFn: async (payload: { crop_listing_id: string; quantity: number }) => {
+      const response = await api.post("/cart/items", payload);
       return response.data;
     },
     onSuccess: () => {
       toast({
-        title: "Order Placed Successfully",
-        description: "Your order has been recorded and is pending farmer confirmation.",
+        title: "Added to Cart",
+        description: "Review your cart before checkout.",
         variant: "default",
       });
-      router.push("/marketplace");
+      router.push("/cart");
     },
     onError: (err: unknown) => {
       const errMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to place order. Please try again.";
       toast({
-        title: "Order Failed",
+        title: "Add to Cart Failed",
         description: errMsg,
         variant: "destructive",
       });
     },
   });
 
-  const handleCheckout = () => {
+  const handleAddToCart = () => {
     if (!user) {
       toast({
         title: "Authentication Required",
-        description: "Please log in to purchase crop listings.",
+        description: "Please log in to add crop listings to your cart.",
         variant: "destructive",
       });
       router.push(`/login?redirect=/marketplace/${listingId}`);
@@ -104,14 +121,7 @@ export default function ListingDetailPage() {
       return;
     }
 
-    checkoutMutation.mutate({
-      items: [
-        {
-          crop_listing_id: listingId,
-          quantity: quantity,
-        },
-      ],
-    });
+    addToCartMutation.mutate({ crop_listing_id: listingId, quantity });
   };
 
   if (isLoading) {
@@ -153,10 +163,10 @@ export default function ListingDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left Side: Product Image Display */}
         <div className="w-full h-[350px] md:h-[450px] bg-secondary/20 rounded-2xl flex items-center justify-center overflow-hidden border border-secondary/30 relative">
-          {listing.image_urls ? (
+          {listing.primary_image_url || listing.image_urls ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={listing.image_urls.split(",")[0]}
+              src={listing.primary_image_url || listing.image_urls?.split(",")[0]}
               alt={listing.title}
               className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
             />
@@ -167,6 +177,15 @@ export default function ListingDetailPage() {
             </div>
           )}
         </div>
+
+        {listing.images?.length ? (
+          <div className="md:hidden grid grid-cols-3 gap-2">
+            {listing.images.slice(0, 3).map((image) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={image.id} src={image.image_url} alt={listing.title} className="h-20 w-full rounded-lg object-cover border border-slate-200" />
+            ))}
+          </div>
+        ) : null}
 
         {/* Right Side: Product Details & Order Card */}
         <div className="flex flex-col justify-between h-full space-y-6">
@@ -183,6 +202,14 @@ export default function ListingDetailPage() {
               <div className="px-3 py-1 bg-primary/10 text-primary font-semibold text-xs rounded-full">
                 Verified Farmer Listing
               </div>
+              <Link href={`/farmers/${listing.farmer_id}`} className="px-3 py-1 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-full hover:bg-emerald-100">
+                View Farmer Profile
+              </Link>
+            </div>
+
+            <div className="inline-flex items-center gap-1 text-sm text-slate-600">
+              <Star className="h-4 w-4 text-amber-500" />
+              {listing.average_rating ? `${listing.average_rating}/5 (${listing.review_count} reviews)` : "No reviews yet"}
             </div>
 
             <div className="h-px bg-muted" />
@@ -197,7 +224,7 @@ export default function ListingDetailPage() {
 
           <Card className="border-secondary/20 shadow-md">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold">Purchase Order</CardTitle>
+              <CardTitle className="text-lg font-bold">Add to Cart</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center">
@@ -236,23 +263,42 @@ export default function ListingDetailPage() {
             </CardContent>
             <CardFooter>
               <Button
-                onClick={handleCheckout}
-                disabled={maxQty <= 0 || checkoutMutation.isPending}
+                onClick={handleAddToCart}
+                disabled={maxQty <= 0 || addToCartMutation.isPending}
                 className="w-full flex items-center justify-center gap-2 font-bold py-6 text-base"
               >
-                {checkoutMutation.isPending ? (
+                {addToCartMutation.isPending ? (
                   <>
-                    <Loader2 className="h-5 w-5 animate-spin" /> Placing Order...
+                    <Loader2 className="h-5 w-5 animate-spin" /> Adding...
                   </>
                 ) : (
                   <>
-                    <ShoppingCart className="h-5 w-5" /> Buy Now
+                    <ShoppingCart className="h-5 w-5" /> Add to Cart
                   </>
                 )}
               </Button>
             </CardFooter>
           </Card>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-2xl font-extrabold text-slate-900 mb-4">Reviews</h2>
+        {reviews.length === 0 ? (
+          <Card><CardContent className="p-6 text-slate-500">No reviews yet.</CardContent></Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {reviews.map((review) => (
+              <Card key={review.id}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="font-bold flex items-center gap-1"><Star className="h-4 w-4 text-amber-500" /> {review.rating}/5</div>
+                  <p className="text-sm text-slate-600">{review.comment}</p>
+                  <p className="text-xs text-slate-400">{review.reviewer_name || "Customer"} · {new Date(review.created_at).toLocaleDateString()}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

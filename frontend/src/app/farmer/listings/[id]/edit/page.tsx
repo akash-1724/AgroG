@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter, useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
@@ -41,8 +41,10 @@ function EditListingContent() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const listingId = params.id as string;
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [imageFiles, setImageFiles] = React.useState<FileList | null>(null);
 
   const {
     register: formRegister,
@@ -54,7 +56,7 @@ function EditListingContent() {
   });
 
   // Query to fetch current listing values
-  const { isLoading: isLoadingData } = useQuery({
+  const { data: listingData, isLoading: isLoadingData } = useQuery({
     queryKey: ["editListing", listingId],
     queryFn: async () => {
       const response = await api.get(`/marketplace/listings/${listingId}`);
@@ -71,6 +73,38 @@ function EditListingContent() {
       return data;
     },
     enabled: !!listingId,
+  });
+
+  const uploadImagesMutation = useMutation({
+    mutationFn: async () => {
+      if (!imageFiles?.length) return;
+      for (const file of Array.from(imageFiles)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        await api.post(`/marketplace/listings/${listingId}/images`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+      }
+    },
+    onSuccess: async () => {
+      toast("Listing image uploaded successfully.", "success");
+      setImageFiles(null);
+      await queryClient.invalidateQueries({ queryKey: ["editListing", listingId] });
+    },
+    onError: (error: unknown) => {
+      const msg = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to upload listing image.";
+      toast(msg, "error");
+    },
+  });
+
+  const deleteImageMutation = useMutation({
+    mutationFn: async (imageId: string) => api.delete(`/marketplace/listings/${listingId}/images/${imageId}`),
+    onSuccess: async () => {
+      toast("Listing image deleted.", "success");
+      await queryClient.invalidateQueries({ queryKey: ["editListing", listingId] });
+    },
+    onError: (error: unknown) => {
+      const msg = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to delete listing image.";
+      toast(msg, "error");
+    },
   });
 
   const onSubmit = async (data: ListingFormValues) => {
@@ -174,8 +208,29 @@ function EditListingContent() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Image URL (Optional)</label>
+              <label className="text-sm font-medium text-slate-700">Legacy Image URL (Optional)</label>
               <Input placeholder="https://example.com/tomatoes.jpg" {...formRegister("image_urls")} />
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <label className="text-sm font-medium text-slate-700">Uploaded Images</label>
+              {listingData?.images?.length ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {listingData.images.map((image: { id: string; image_url: string; is_primary: boolean }) => (
+                    <div key={image.id} className="space-y-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.image_url} alt="Listing" className="h-24 w-full rounded-lg object-cover border border-slate-200" />
+                      <Button type="button" size="sm" variant="outline" onClick={() => deleteImageMutation.mutate(image.id)} disabled={deleteImageMutation.isPending}>
+                        Delete {image.is_primary ? "Primary" : ""}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-xs text-slate-500">No uploaded images yet.</p>}
+              <Input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setImageFiles(event.target.files)} />
+              <Button type="button" variant="outline" onClick={() => uploadImagesMutation.mutate()} disabled={!imageFiles?.length || uploadImagesMutation.isPending}>
+                {uploadImagesMutation.isPending ? "Uploading..." : "Upload Selected Images"}
+              </Button>
             </div>
 
             <Button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold" disabled={isSubmitting}>

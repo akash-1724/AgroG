@@ -218,16 +218,33 @@ async def google_login(
     user = result.scalars().first()
     
     if not user:
-        # Auto-register as customer
+        requested_role = payload.role.lower()
+        if requested_role not in {"customer", "farmer"}:
+            requested_role = "customer"
+
+        # Auto-register OAuth users as customer or farmer based on the registration form selection.
         # Set a secure random password since this is an OAuth user
         random_pwd = uuid.uuid4().hex
         user = User(
             email=email,
             password_hash=get_password_hash(random_pwd),
             full_name=full_name,
-            role="customer"
+            role=requested_role
         )
         db.add(user)
+        await db.flush()
+
+        if requested_role == "farmer":
+            farmer_details = payload.farmer_details
+            db.add(FarmerProfile(
+                user_id=user.id,
+                farm_name=farmer_details.farm_name if farmer_details else "New Farm",
+                latitude=farmer_details.latitude if farmer_details else 0.0,
+                longitude=farmer_details.longitude if farmer_details else 0.0,
+                address=farmer_details.address if farmer_details else "TBD",
+                description=farmer_details.description if farmer_details and farmer_details.description else ""
+            ))
+
         await db.commit()
         await db.refresh(user)
         
@@ -258,6 +275,14 @@ async def google_login(
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "role": user.role
+    }
+
+@router.get("/google/client-id")
+async def get_google_client_id():
+    """Return the public OAuth client ID needed by Google Identity Services."""
+    return {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "configured": bool(settings.GOOGLE_CLIENT_ID),
     }
 
 @router.post("/refresh", response_model=TokenResponse)

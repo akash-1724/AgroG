@@ -6,13 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Script from "next/script";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/components/shared/auth-context";
+import { GoogleAuthButton, type GoogleAuthTokenData } from "@/components/shared/google-auth-button";
 import { api } from "@/lib/api";
 
 const loginSchema = z.object({
@@ -28,6 +28,17 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const redirectByRole = React.useCallback(
+    (role?: string) => {
+      if (role === "farmer") {
+        router.push("/farmer/listings");
+      } else {
+        router.push("/marketplace");
+      }
+    },
+    [router]
+  );
+
   const {
     register: formRegister,
     handleSubmit,
@@ -42,13 +53,7 @@ export default function LoginPage() {
       const response = await api.post("/auth/token-json", data);
       await login(response.data);
       toast("Login successful!", "success");
-      
-      const role = response.data.role || "customer";
-      if (role === "farmer") {
-        router.push("/farmer/listings");
-      } else {
-        router.push("/marketplace");
-      }
+      redirectByRole(response.data.role);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       const msg = err.response?.data?.detail || "Login failed. Check your credentials.";
@@ -58,53 +63,14 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleCredentialResponse = React.useCallback(
-    async (response: any) => {
-      try {
-        const apiResponse = await api.post("/auth/google", {
-          id_token: response.credential,
-        });
-        await login(apiResponse.data);
-        toast("Google Login successful!", "success");
-
-        const role = apiResponse.data.role || "customer";
-        if (role === "farmer") {
-          router.push("/farmer/listings");
-        } else {
-          router.push("/marketplace");
-        }
-      } catch (error: unknown) {
-        const err = error as { response?: { data?: { detail?: string } } };
-        const msg = err.response?.data?.detail || "Google Login failed.";
-        toast(msg, "error");
-      }
+  const handleGoogleAuthenticated = React.useCallback(
+    async (tokenData: GoogleAuthTokenData) => {
+      await login(tokenData);
+      toast("Google login successful!", "success");
+      redirectByRole(tokenData.role);
     },
-    [login, router, toast]
+    [login, redirectByRole, toast]
   );
-
-  const initGoogleAuth = React.useCallback(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      console.warn("NEXT_PUBLIC_GOOGLE_CLIENT_ID is not defined in the environment");
-      return;
-    }
-
-    const google = (window as any).google;
-    if (google?.accounts?.id) {
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredentialResponse,
-      });
-      google.accounts.id.renderButton(
-        document.getElementById("google-signin-btn"),
-        { theme: "outline", size: "large", width: "100%", text: "continue_with" }
-      );
-    }
-  }, [handleGoogleCredentialResponse]);
-
-  React.useEffect(() => {
-    initGoogleAuth();
-  }, [initGoogleAuth]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
@@ -149,9 +115,11 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="w-full flex justify-center min-h-[40px]">
-            <div id="google-signin-btn" className="w-full"></div>
-          </div>
+          <GoogleAuthButton
+            text="signin_with"
+            onAuthenticated={handleGoogleAuthenticated}
+            onError={(message) => toast(message, "error")}
+          />
         </CardContent>
         <CardFooter className="flex flex-wrap items-center justify-center gap-1 text-sm">
           <span>Don&apos;t have an account?</span>
@@ -160,11 +128,6 @@ export default function LoginPage() {
           </Link>
         </CardFooter>
       </Card>
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        onReady={initGoogleAuth}
-        strategy="lazyOnload"
-      />
     </div>
   );
 }

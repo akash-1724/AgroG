@@ -1,14 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, Tag } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, Tag, Star, ShoppingCart } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { api } from "@/lib/api";
+import { useAuth } from "@/components/shared/auth-context";
+import { useToast } from "@/components/ui/toast";
 
 interface CropListing {
   id: string;
@@ -19,8 +21,11 @@ interface CropListing {
   unit: string;
   available_quantity: number;
   image_urls?: string;
+  primary_image_url?: string | null;
   category: string;
   status: string;
+  average_rating?: number | null;
+  review_count: number;
 }
 
 const CATEGORIES = ["All", "Vegetables", "Fruits", "Grains", "Pulses", "Spices", "Other"];
@@ -32,6 +37,9 @@ export default function MarketplacePage() {
   const [selectedCategory, setSelectedCategory] = React.useState("All");
   const [sortOrder, setSortOrder] = React.useState("latest");
   const [page, setPage] = React.useState(1);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Debounce search
   React.useEffect(() => {
@@ -61,6 +69,27 @@ export default function MarketplacePage() {
       return response.data;
     }
   });
+
+  const addToCart = useMutation({
+    mutationFn: async (listingId: string) => (await api.post("/cart/items", { crop_listing_id: listingId, quantity: 1 })).data,
+    onSuccess: () => {
+      toast("Added to cart.", "success");
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+    onError: (err: unknown) => toast((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Could not add item to cart.", "error"),
+  });
+
+  const handleAddToCart = (listingId: string) => {
+    if (!user) {
+      toast("Please sign in as a customer to add items to cart.", "error");
+      return;
+    }
+    if (user.role !== "customer") {
+      toast("Only customer accounts can use the cart.", "error");
+      return;
+    }
+    addToCart.mutate(listingId);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -156,10 +185,10 @@ export default function MarketplacePage() {
               <Card key={item.id} className="flex flex-col h-full hover:shadow-lg hover:border-emerald-500/30 transition-all duration-300 bg-white border border-slate-200/80 rounded-xl overflow-hidden group">
                 {/* Product Image Placeholder */}
                 <div className="h-44 w-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-sm relative overflow-hidden">
-                  {item.image_urls ? (
+                  {item.primary_image_url || item.image_urls ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={item.image_urls.split(",")[0]}
+                      src={item.primary_image_url || item.image_urls?.split(",")[0]}
                       alt={item.title}
                       className="h-full w-full object-cover group-hover:scale-105 transition duration-500"
                     />
@@ -177,8 +206,15 @@ export default function MarketplacePage() {
                   <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                     {item.description}
                   </p>
+                  <Link href={`/farmers/${item.farmer_id}`} className="text-xs font-semibold text-emerald-700 hover:underline">
+                    View farmer profile
+                  </Link>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
+                  <div className="mb-3 text-xs text-slate-500 inline-flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5 text-amber-500" />
+                    {item.average_rating ? `${item.average_rating}/5 (${item.review_count})` : "No reviews yet"}
+                  </div>
                   <div className="flex justify-between items-baseline">
                     <span className="text-lg font-extrabold text-slate-950">
                       ${item.price_per_unit}{" "}
@@ -189,12 +225,19 @@ export default function MarketplacePage() {
                     </span>
                   </div>
                 </CardContent>
-                <CardFooter className="p-4 pt-0">
-                  <Link href={`/marketplace/${item.id}`} className="w-full">
-                    <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold transition">
+                <CardFooter className="p-4 pt-0 flex gap-2">
+                  <Link href={`/marketplace/${item.id}`} className="flex-1">
+                    <Button variant="outline" className="w-full font-bold transition">
                       View Details
                     </Button>
                   </Link>
+                  <Button
+                    onClick={() => handleAddToCart(item.id)}
+                    disabled={addToCart.isPending}
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold transition"
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-1" /> Add
+                  </Button>
                 </CardFooter>
               </Card>
             ))}

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const resourceFormSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters").max(255),
@@ -31,6 +32,14 @@ const resourceFormSchema = z.object({
 type ResourceFormValues = z.infer<typeof resourceFormSchema>;
 
 export default function EditResourcePage() {
+  return (
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <EditResourceContent />
+    </ProtectedRoute>
+  );
+}
+
+function EditResourceContent() {
   const { id } = useParams();
   const { toast } = useToast();
   const router = useRouter();

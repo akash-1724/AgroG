@@ -39,6 +39,7 @@ function NewListingContent() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [imageFiles, setImageFiles] = React.useState<FileList | null>(null);
 
   const {
     register: formRegister,
@@ -55,7 +56,14 @@ function NewListingContent() {
   const onSubmit = async (data: ListingFormValues) => {
     setIsSubmitting(true);
     try {
-      await api.post("/marketplace/listings", data);
+      const listing = (await api.post("/marketplace/listings", data)).data;
+      if (imageFiles?.length) {
+        for (const file of Array.from(imageFiles)) {
+          const formData = new FormData();
+          formData.append("file", file);
+          await api.post(`/marketplace/listings/${listing.id}/images`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+        }
+      }
       toast("Crop listing created successfully!", "success");
       router.push("/farmer/listings");
     } catch (error: unknown) {
@@ -133,8 +141,15 @@ function NewListingContent() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Image URL (Optional)</label>
+              <label className="text-sm font-medium text-slate-700">Legacy Image URL (Optional)</label>
               <Input placeholder="https://example.com/tomatoes.jpg" {...formRegister("image_urls")} />
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <label className="text-sm font-medium text-slate-700">Upload Listing Images</label>
+              <Input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setImageFiles(event.target.files)} />
+              <p className="text-xs text-slate-500">Images upload through the backend after the listing is created. Cloudinary must be configured on the backend.</p>
+              {imageFiles && <p className="text-xs font-semibold text-emerald-700">{imageFiles.length} file(s) selected.</p>}
             </div>
 
             <Button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold" disabled={isSubmitting}>

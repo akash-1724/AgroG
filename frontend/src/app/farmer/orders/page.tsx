@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, ShoppingBag, UserCheck, Calendar, DollarSign, Package } from "lucide-react";
+import { ShoppingBag, Calendar, DollarSign, Package } from "lucide-react";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -10,22 +10,34 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 
+type FulfillmentStatus = "pending" | "accepted" | "ready" | "completed" | "rejected" | "cancelled";
+
 interface OrderItem {
   id: string;
   order_id: string;
   crop_listing_id: string;
   quantity: number;
   price_at_purchase: number;
+  status: FulfillmentStatus;
 }
 
 interface Order {
   id: string;
   customer_id: string;
-  status: "pending" | "accepted" | "ready" | "completed" | "rejected" | "cancelled";
+  status: FulfillmentStatus;
   total_amount: number;
   created_at: string;
   items: OrderItem[];
 }
+
+const itemStatusActions: Record<FulfillmentStatus, FulfillmentStatus[]> = {
+  pending: ["accepted", "rejected"],
+  accepted: ["ready", "rejected"],
+  ready: ["completed"],
+  completed: [],
+  rejected: [],
+  cancelled: [],
+};
 
 export default function FarmerOrdersPage() {
   return (
@@ -48,14 +60,13 @@ function FarmerOrdersContent() {
     }
   });
 
-  // Mutation to update order status
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await api.patch(`/marketplace/orders/${id}`, { status });
+    mutationFn: async ({ id, status }: { id: string; status: FulfillmentStatus }) => {
+      const response = await api.patch(`/marketplace/order-items/${id}/status`, { status });
       return response.data;
     },
     onSuccess: (data) => {
-      toast(`Order status updated to ${data.status} successfully.`, "success");
+      toast(`Item status updated. Order is now ${data.status}.`, "success");
       queryClient.invalidateQueries({ queryKey: ["farmerOrders"] });
     },
     onError: (err: unknown) => {
@@ -64,7 +75,7 @@ function FarmerOrdersContent() {
     }
   });
 
-  const handleStatusUpdate = (id: string, nextStatus: string) => {
+  const handleStatusUpdate = (id: string, nextStatus: FulfillmentStatus) => {
     updateStatusMutation.mutate({ id, status: nextStatus });
   };
 
@@ -130,72 +141,39 @@ function FarmerOrdersContent() {
                 </div>
               </div>
 
-              {/* Items and Action Buttons */}
-              <div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                {/* List Items */}
-                <div className="space-y-2 flex-grow">
+                <div className="p-6 flex flex-col gap-6">
+                <div className="space-y-3 flex-grow">
                   <h4 className="text-xs font-bold text-slate-400 tracking-wider uppercase">Order Contents</h4>
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     {order.items.map((item) => (
-                      <div key={item.id} className="text-sm text-slate-700 flex items-center gap-2">
-                        <span className="font-semibold text-slate-900">Qty: {item.quantity}</span>
-                        <span>x</span>
-                        <span className="text-xs text-slate-400">Listing Reference ({item.crop_listing_id.slice(0, 8)})</span>
-                        <span className="text-slate-400">@ ${item.price_at_purchase} / unit</span>
+                      <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="text-sm text-slate-700 flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-900">Qty: {item.quantity}</span>
+                          <span>x</span>
+                          <span className="text-xs text-slate-400">Listing Reference ({item.crop_listing_id.slice(0, 8)})</span>
+                          <span className="text-slate-400">@ ${item.price_at_purchase} / unit</span>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">{item.status}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {itemStatusActions[item.status].map((nextStatus) => (
+                            <Button
+                              key={nextStatus}
+                              size="sm"
+                              variant={nextStatus === "rejected" ? "outline" : "default"}
+                              onClick={() => handleStatusUpdate(item.id, nextStatus)}
+                              disabled={updateStatusMutation.isPending}
+                              className={nextStatus === "rejected" ? "text-red-500 hover:bg-red-50 hover:border-red-200" : "bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold"}
+                            >
+                              Mark {nextStatus}
+                            </Button>
+                          ))}
+                          {itemStatusActions[item.status].length === 0 && (
+                            <span className="text-xs font-semibold text-slate-400 italic">No further actions</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                {/* Action State Machine Controls */}
-                <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                  {order.status === "pending" && (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={() => handleStatusUpdate(order.id, "accepted")}
-                        disabled={updateStatusMutation.isPending}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold"
-                      >
-                        Accept Order
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleStatusUpdate(order.id, "rejected")}
-                        disabled={updateStatusMutation.isPending}
-                        className="text-red-500 hover:bg-red-50 hover:border-red-200"
-                      >
-                        Reject
-                      </Button>
-                    </>
-                  )}
-
-                  {order.status === "accepted" && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleStatusUpdate(order.id, "ready")}
-                      disabled={updateStatusMutation.isPending}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
-                    >
-                      Mark Ready to Ship
-                    </Button>
-                  )}
-
-                  {order.status === "ready" && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleStatusUpdate(order.id, "completed")}
-                      disabled={updateStatusMutation.isPending}
-                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
-                    >
-                      Complete Delivery
-                    </Button>
-                  )}
-
-                  {["completed", "rejected", "cancelled"].includes(order.status) && (
-                    <span className="text-xs font-semibold text-slate-400 italic">No further actions available</span>
-                  )}
                 </div>
               </div>
             </Card>

@@ -3,6 +3,24 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, condecimal
 
+
+class ListingImageResponse(BaseModel):
+    id: uuid.UUID
+    listing_id: uuid.UUID
+    image_url: str
+    public_id: Optional[str] = None
+    alt_text: Optional[str] = None
+    sort_order: int = 0
+    is_primary: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ListingImageUploadResponse(BaseModel):
+    image: ListingImageResponse
+
 # Schema for creating a crop listing
 class CropListingCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
@@ -35,8 +53,12 @@ class CropListingResponse(BaseModel):
     unit: str
     available_quantity: int
     image_urls: Optional[str] = None
+    images: List[ListingImageResponse] = []
+    primary_image_url: Optional[str] = None
     category: str
     status: str
+    average_rating: Optional[float] = None
+    review_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -58,6 +80,9 @@ class OrderItemResponse(BaseModel):
     crop_listing_id: uuid.UUID
     quantity: int
     price_at_purchase: float
+    status: str = "pending"
+    status_updated_at: Optional[datetime] = None
+    fulfilled_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -91,3 +116,7 @@ class FarmerOrderResponse(BaseModel):
 # Schema for updating order status
 class OrderStatusUpdate(BaseModel):
     status: str = Field(..., pattern="^(pending|accepted|rejected|ready|completed|cancelled)$", description="Target status")
+
+
+class OrderItemStatusUpdate(BaseModel):
+    status: str = Field(..., pattern="^(pending|accepted|rejected|ready|completed|cancelled)$", description="Target item status")

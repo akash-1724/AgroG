@@ -6,13 +6,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { Sprout, AlertCircle, ArrowRight, Loader2, RefreshCw } from "lucide-react";
-import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
+import { useAuth } from "@/components/shared/auth-context";
+
+const optionalCoordinate = z.preprocess((value) => value === "" ? undefined : value, z.coerce.number().optional());
 
 const cropFormSchema = z.object({
   nitrogen: z.coerce.number().min(0, "Must be >= 0").max(200, "Must be <= 200"),
@@ -22,16 +24,25 @@ const cropFormSchema = z.object({
   temperature: z.coerce.number().min(0, "Must be >= 0").max(50, "Must be <= 50"),
   humidity: z.coerce.number().min(10, "Humidity must be 10-100%").max(100, "Humidity must be 10-100%"),
   rainfall: z.coerce.number().min(10, "Rainfall must be >= 10mm").max(500, "Rainfall must be <= 500mm"),
+  useWeather: z.boolean().default(false),
+  latitude: optionalCoordinate,
+  longitude: optionalCoordinate,
+  useProfileLocation: z.boolean().default(true),
 });
 
 type CropFormValues = z.infer<typeof cropFormSchema>;
 
 export default function CropRecommendationPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [recommendations, setRecommendations] = React.useState<string[] | null>(null);
   const [modelStatus, setModelStatus] = React.useState<string | null>(null);
   const [disclaimer, setDisclaimer] = React.useState<string | null>(null);
   const [limitations, setLimitations] = React.useState<string | null>(null);
+  const [usedWeather, setUsedWeather] = React.useState<boolean | null>(null);
+  const [weatherWarning, setWeatherWarning] = React.useState<string | null>(null);
+  const [providerStatus, setProviderStatus] = React.useState<string | null>(null);
+  const [weatherSummary, setWeatherSummary] = React.useState<string | null>(null);
 
   const {
     register,
@@ -48,12 +59,21 @@ export default function CropRecommendationPage() {
       temperature: 25,
       humidity: 60,
       rainfall: 100,
+      useWeather: false,
+      latitude: undefined,
+      longitude: undefined,
+      useProfileLocation: true,
     },
   });
 
   const recommendationMutation = useMutation({
     mutationFn: async (values: CropFormValues) => {
-      const response = await api.post("/recommendations/crop", values);
+      const { useWeather, latitude, longitude, useProfileLocation, ...basePayload } = values;
+      const endpoint = useWeather ? "/recommendations/crop/weather-aware" : "/recommendations/crop";
+      const payload = useWeather
+        ? { ...basePayload, latitude, longitude, use_profile_location: useProfileLocation }
+        : basePayload;
+      const response = await api.post(endpoint, payload);
       return response.data;
     },
     onSuccess: (data) => {
@@ -61,6 +81,10 @@ export default function CropRecommendationPage() {
       setModelStatus(data.model_status || "demo");
       setDisclaimer(data.disclaimer || "");
       setLimitations(data.limitations || "");
+      setUsedWeather(data.used_weather ?? null);
+      setWeatherWarning(data.weather_warning || null);
+      setProviderStatus(data.provider_status || null);
+      setWeatherSummary(data.weather ? `${data.weather.temperature ?? "?"}°C, ${data.weather.humidity ?? "?"}% humidity, ${data.weather.rainfall ?? data.weather.precipitation ?? "?"}mm rain` : null);
       toast({
         title: "Analysis Complete",
         description: "Successfully processed soil and climate parameters.",
@@ -87,6 +111,10 @@ export default function CropRecommendationPage() {
     setModelStatus(null);
     setDisclaimer(null);
     setLimitations(null);
+    setUsedWeather(null);
+    setWeatherWarning(null);
+    setProviderStatus(null);
+    setWeatherSummary(null);
   };
 
   return (
@@ -139,6 +167,32 @@ export default function CropRecommendationPage() {
                   <label className="text-xs font-semibold text-muted-foreground">Temperature (°C)</label>
                   <Input {...register("temperature")} type="number" step="any" placeholder="e.g. 25" />
                   {errors.temperature && <p className="text-[10px] text-destructive">{errors.temperature.message}</p>}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-3">
+                <label className="flex items-start gap-2 text-sm font-semibold text-emerald-950">
+                  <input type="checkbox" className="mt-1" {...register("useWeather")} />
+                  Use live weather context when possible
+                </label>
+                <p className="text-[11px] text-emerald-800">
+                  If weather is unavailable, AgroGuide will still run the normal recommendation and show a fallback note.
+                </p>
+                {user?.role === "farmer" && (
+                  <label className="flex items-start gap-2 text-xs font-medium text-emerald-900">
+                    <input type="checkbox" className="mt-0.5" {...register("useProfileLocation")} />
+                    Use my farmer profile location when coordinates are blank
+                  </label>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Latitude</label>
+                    <Input {...register("latitude")} type="number" step="any" placeholder="Optional" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Longitude</label>
+                    <Input {...register("longitude")} type="number" step="any" placeholder="Optional" />
+                  </div>
                 </div>
               </div>
 
@@ -204,6 +258,15 @@ export default function CropRecommendationPage() {
                         <p className="font-bold text-amber-950">Baseline Demo Mode Active</p>
                         <p className="text-[10px] text-amber-800 font-medium mt-0.5">Predictions are rule-based baseline mocks for local evaluation.</p>
                       </div>
+                    </div>
+                  )}
+
+                  {usedWeather !== null && (
+                    <div className={`p-3 rounded-lg border text-xs font-semibold ${usedWeather ? "bg-sky-50 text-sky-900 border-sky-200" : "bg-orange-50 text-orange-900 border-orange-200"}`}>
+                      <p className="font-bold">Weather context: {usedWeather ? "Used" : "Not used"}</p>
+                      {weatherSummary && <p className="mt-1 font-medium">{weatherSummary}</p>}
+                      {providerStatus && <p className="mt-1 font-medium">Provider status: {providerStatus}</p>}
+                      {weatherWarning && <p className="mt-1 font-medium">{weatherWarning}</p>}
                     </div>
                   )}
 

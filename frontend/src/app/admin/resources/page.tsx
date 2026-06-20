@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface Article {
   id: string;
@@ -23,6 +24,14 @@ interface Article {
 }
 
 export default function AdminResourcesPage() {
+  return (
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <AdminResourcesContent />
+    </ProtectedRoute>
+  );
+}
+
+function AdminResourcesContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

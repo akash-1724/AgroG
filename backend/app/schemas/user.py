@@ -47,7 +47,8 @@ class TokenResponse(BaseModel):
 # Schema for Google OAuth Token Login
 class GoogleLogin(BaseModel):
     id_token: str
+    role: str = "customer"
+    farmer_details: Optional[FarmerProfileCreate] = None
 
 class TokenRefreshRequest(BaseModel):
     refresh_token: str
-

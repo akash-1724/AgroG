@@ -27,6 +27,11 @@ class User(Base):
     disease_detections: Mapped[List["DiseaseDetectionRecord"]] = relationship("DiseaseDetectionRecord", back_populates="user")
     articles: Mapped[List["EducationalArticle"]] = relationship("EducationalArticle", back_populates="author")
     refresh_tokens: Mapped[List["RefreshToken"]] = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    cart: Mapped[Optional["Cart"]] = relationship("Cart", back_populates="customer", uselist=False, cascade="all, delete-orphan")
+    reviews: Mapped[List["Review"]] = relationship("Review", back_populates="customer", cascade="all, delete-orphan")
+    recommendation_history: Mapped[List["RecommendationHistory"]] = relationship(
+        "RecommendationHistory", back_populates="user", cascade="all, delete-orphan"
+    )
 
 class FarmerProfile(Base):
     __tablename__ = "farmer_profiles"
@@ -49,3 +54,4 @@ class FarmerProfile(Base):
     crop_listings: Mapped[List["CropListing"]] = relationship(
         "CropListing", back_populates="farmer", cascade="all, delete-orphan"
     )
+    reviews: Mapped[List["Review"]] = relationship("Review", back_populates="farmer", cascade="all, delete-orphan")

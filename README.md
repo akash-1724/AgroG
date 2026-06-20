@@ -37,6 +37,14 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+To load sample marketplace listings, farmers, educational articles, and verified external image URLs after migrations:
+```bash
+cd backend
+PYTHONPATH=. ../venv/bin/python -m app.seed_sample_data
+```
+
+Seeded demo users use this password: `AgroGuideDemo123!`
+
 ### 2. ML Service
 ```bash
 cd ml_service

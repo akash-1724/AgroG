@@ -12,8 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const locationFormSchema = z.object({
+  farm_name: z.string().max(255).optional(),
+  description: z.string().max(1000).optional(),
   latitude: z.coerce.number().min(-90.0, "Latitude must be between -90 and 90").max(90.0, "Latitude must be between -90 and 90"),
   longitude: z.coerce.number().min(-180.0, "Longitude must be between -180 and 180").max(180.0, "Longitude must be between -180 and 180"),
   address: z.string().min(5, "Address must be at least 5 characters").max(500),
@@ -26,6 +29,14 @@ const locationFormSchema = z.object({
 type LocationFormValues = z.infer<typeof locationFormSchema>;
 
 export default function FarmerLocationPage() {
+  return (
+    <ProtectedRoute allowedRoles={["farmer"]}>
+      <FarmerLocationContent />
+    </ProtectedRoute>
+  );
+}
+
+function FarmerLocationContent() {
   const { toast } = useToast();
 
   const {
@@ -40,6 +51,8 @@ export default function FarmerLocationPage() {
     defaultValues: {
       latitude: 0.0,
       longitude: 0.0,
+      farm_name: "",
+      description: "",
       address: "",
       district: "",
       city: "",
@@ -66,6 +79,8 @@ export default function FarmerLocationPage() {
       reset({
         latitude: profile.latitude ?? 0.0,
         longitude: profile.longitude ?? 0.0,
+        farm_name: profile.farm_name ?? "",
+        description: profile.description ?? "",
         address: profile.address ?? "",
         district: profile.district ?? "",
         city: profile.city ?? "",
@@ -77,8 +92,27 @@ export default function FarmerLocationPage() {
 
   const updateLocationMutation = useMutation({
     mutationFn: async (values: LocationFormValues) => {
-      const response = await api.patch("/farmers/me/location", values);
-      return response.data;
+      const [locationResponse] = await Promise.all([
+        api.patch("/farmers/me/location", {
+          latitude: values.latitude,
+          longitude: values.longitude,
+          address: values.address,
+          district: values.district,
+          city: values.city,
+          state: values.state,
+          location_visibility: values.location_visibility,
+        }),
+        api.patch("/farmers/me/profile", {
+          farm_name: values.farm_name,
+          description: values.description,
+          address: values.address,
+          district: values.district,
+          city: values.city,
+          state: values.state,
+          location_visibility: values.location_visibility,
+        }),
+      ]);
+      return locationResponse.data;
     },
     onSuccess: () => {
       toast({
@@ -152,6 +186,22 @@ export default function FarmerLocationPage() {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Farm Name</label>
+              <Input {...register("farm_name")} placeholder="e.g. Green Valley Organics" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Public Description</label>
+              <textarea
+                {...register("description")}
+                rows={3}
+                placeholder="Tell buyers about your farm, crops, and farming practices."
+                className="w-full border border-input bg-background px-3 py-2 rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2"
+              />
+              {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Latitude */}
               <div className="space-y-1">
