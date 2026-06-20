@@ -228,16 +228,19 @@ export default function FertilizerRecommendationPage() {
                     </div>
                   </div>
 
-                  <div className="h-px bg-muted" />
-
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-extrabold text-muted-foreground tracking-wider uppercase">
-                      Application Guidelines
-                    </h3>
-                    <p className="text-sm text-foreground leading-relaxed p-3 bg-secondary/20 border border-secondary/30 rounded-lg">
-                      {recommendation.guideline}
-                    </p>
-                  </div>
+                  {recommendation.guideline && (
+                    <>
+                      <div className="h-px bg-muted" />
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-extrabold text-muted-foreground tracking-wider uppercase">
+                          Application Guidelines
+                        </h3>
+                        <p className="text-sm text-foreground leading-relaxed p-3 bg-secondary/20 border border-secondary/30 rounded-lg">
+                          {recommendation.guideline}
+                        </p>
+                      </div>
+                    </>
+                  )}
 
                   {disclaimer && (
                     <div className="p-3 bg-red-50/50 border border-red-200/50 rounded-lg text-[10px] text-red-800 font-medium">

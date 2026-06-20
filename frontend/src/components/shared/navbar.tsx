@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { useAuth } from "./auth-context";
 import { useState } from "react";
-import { Menu, X, Leaf, ShoppingBag, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, Leaf, User as UserIcon, LogOut, ShoppingCart } from "lucide-react";
+
+const advisoryLinks = [
+  { href: "/recommendations/crop", label: "Crop Advisor" },
+  { href: "/recommendations/fertilizer", label: "Fertilizer Planner" },
+  { href: "/diagnostics/disease", label: "Disease Scanner" },
+  { href: "/prices", label: "Market Prices" },
+  { href: "/recommendations/history", label: "AI History" },
+];
 
 export function NavBar() {
   const { user, logout } = useAuth();
@@ -26,6 +34,11 @@ export function NavBar() {
             <Link href="/marketplace" className="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition">
               Marketplace
             </Link>
+            {advisoryLinks.map((link) => (
+              <Link key={link.href} href={link.href} className="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition">
+                {link.label}
+              </Link>
+            ))}
 
             {user && (
               <>
@@ -39,10 +52,20 @@ export function NavBar() {
                     </Link>
                   </>
                 )}
-                {user.role === "customer" && (
-                  <Link href="/orders" className="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition">
-                    My Orders
+                {user.role === "admin" && (
+                  <Link href="/admin/dashboard" className="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition">
+                    Admin Dashboard
                   </Link>
+                )}
+                {user.role === "customer" && (
+                  <>
+                    <Link href="/cart" className="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center gap-1.5">
+                      <ShoppingCart className="h-4 w-4" /> Cart
+                    </Link>
+                    <Link href="/orders" className="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition">
+                      My Orders
+                    </Link>
+                  </>
                 )}
               </>
             )}
@@ -104,6 +127,16 @@ export function NavBar() {
           >
             Marketplace
           </Link>
+          {advisoryLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setIsOpen(false)}
+              className="block text-slate-300 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+            >
+              {link.label}
+            </Link>
+          ))}
 
           {user && (
             <>
@@ -126,12 +159,30 @@ export function NavBar() {
                 </>
               )}
               {user.role === "customer" && (
+                <>
+                  <Link
+                    href="/cart"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-2 text-slate-300 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+                  >
+                    <ShoppingCart className="h-5 w-5" /> Cart
+                  </Link>
+                  <Link
+                    href="/orders"
+                    onClick={() => setIsOpen(false)}
+                    className="block text-slate-300 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+                  >
+                    My Orders
+                  </Link>
+                </>
+              )}
+              {user.role === "admin" && (
                 <Link
-                  href="/orders"
+                  href="/admin/dashboard"
                   onClick={() => setIsOpen(false)}
                   className="block text-slate-300 hover:text-white px-3 py-2 rounded-md text-base font-medium"
                 >
-                  My Orders
+                  Admin Dashboard
                 </Link>
               )}
               <div className="border-t border-slate-800 my-2 pt-2" />
