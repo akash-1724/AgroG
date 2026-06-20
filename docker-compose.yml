@@ -56,7 +56,7 @@ services:
       - PYTHONUNBUFFERED=1
       - CROP_MODEL_PATH=models/crop_xgb.json
       - FERTILIZER_MODEL_PATH=models/fertilizer_dt.pkl
-      - ML_DEMO_MODE=True
+      - ML_DEMO_MODE=${ML_DEMO_MODE:-False}
       - MAX_IMAGE_UPLOAD_MB=5
 
   frontend:
