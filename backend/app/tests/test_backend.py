@@ -517,7 +517,7 @@ async def test_weather_aware_crop_recommendation_uses_weather(client, monkeypatc
     async def fake_crop_prediction(payload):
         assert payload.temperature == 29.0
         assert payload.humidity == 65.0
-        assert payload.rainfall == 1.5
+        assert payload.rainfall == 10.0
         return ([{"crop": "rice"}], "demo", "", "")
 
     class StubWeatherProvider:

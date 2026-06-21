@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
   backend:
@@ -15,9 +17,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
-      - run: PYTHONPATH=. pytest app/tests/test_backend.py
+      - run: python -m pytest app/tests/test_backend.py
+        env:
+          PYTHONPATH: .
+          ENVIRONMENT: development
+          JWT_SECRET: ci-backend-access-secret-change-me
+          JWT_REFRESH_SECRET: ci-backend-refresh-secret-change-me
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          REDIS_URL: redis://localhost:6379/0
+          ML_SERVICE_URL: http://localhost:8001
 
   ml-service:
     runs-on: ubuntu-latest
@@ -29,9 +41,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml_service/requirements.txt
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt pytest
-      - run: PYTHONPATH=.. pytest tests/test_ml.py
+      - run: python -m pytest tests/test_ml.py
+        env:
+          PYTHONPATH: ..
+          ML_DEMO_MODE: "True"
 
   frontend:
     runs-on: ubuntu-latest
