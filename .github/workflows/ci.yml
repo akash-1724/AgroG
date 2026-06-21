@@ -27,9 +27,9 @@ jobs:
           ENVIRONMENT: development
           JWT_SECRET: ci-backend-access-secret-change-me
           JWT_REFRESH_SECRET: ci-backend-refresh-secret-change-me
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
-          REDIS_URL: redis://localhost:6379/0
-          ML_SERVICE_URL: http://localhost:8001
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          REDIS_URL: "redis://localhost:6379/0"
+          ML_SERVICE_URL: "http://localhost:8001"
 
   ml-service:
     runs-on: ubuntu-latest
