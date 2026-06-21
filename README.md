@@ -25,7 +25,7 @@ AgroGuide is a collaborative AgriTech learning project designed to assist farmer
 
 AgroGuide was started as a free-time collaborative project by Akash and Christina. The initial idea was selected by Christina from the senior-project topic collection published at [SJCET Project Showcase](https://project.sjcet.in/).
 
-The project is built with AI-assisted development tools, but development is guided through a spec-driven workflow using OpenSpec. Features are planned, specified, implemented, verified, and reviewed in phases rather than being generated as unstructured code.
+The project uses AI-assisted development tools, but development is guided through a spec-driven workflow using OpenSpec. Features are planned, specified, implemented, verified, and reviewed in phases instead of being generated as unstructured code.
 
 ---
 
@@ -78,7 +78,7 @@ To set up environment variables for the system:
    ```
 2. Open `.env` and fill in the required values. Never commit your `.env` file to version control.
 3. Private keys (such as `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_SECRET`, `CLOUDINARY_URL`, and `GEMINI_API_KEY`) must remain secure and blank in template files.
-4. Integrations like Google OAuth, Cloudinary, and Gemini are optional; the application will fall back to simulation/demo behaviors if their respective keys are not provided.
+4. Google OAuth, Cloudinary, Gemini, and Sentry are optional unless their related features are enabled. Sentry has been deprecated/removed in the current application configuration.
 
 ---
 
@@ -175,16 +175,15 @@ python verify_marketplace.py
 * **Plant Disease Scanner**: Leaf disease classification uses a deterministic color-channel pixel statistical heuristic helper. It is not an actual neural network and should be treated purely as a baseline demo/simulation.
 * **Crop/Fertilizer ML Output**: Model prediction accuracy depends on the generalization bounds of the sample training datasets used for model artifacts.
 * **Weather & Market Price Data**: Renders static/fallback mock records if Open-Meteo or other data providers are unreachable.
-* **Advisory Disclaimer**: This project is built for educational/personal-learning purposes. Predictions and suggestions must not be used as professional agricultural advice.
+* **Advisory Disclaimer**: AgroGuide is a free-time learning project. Predictions and suggestions must not be treated as professional agricultural advice.
+* **Google OAuth & AI Providers**: Google OAuth and external AI-provider integrations need optional environment configuration to work fully.
 
 ---
 
 ## Contributors
 
-* **Akash** — Project contributor and maintainer. [akash-1724](https://github.com/akash-1724)
-* **Christina** — Project contributor.
-
-> Christina's profile link can be added later when available.
+* **Akash** — Project contributor and maintainer. [GitHub](https://github.com/akash-1724)
+* **Christina** — Project contributor. [GitHub](https://github.com/chriz-tina)
 
 ---
 
